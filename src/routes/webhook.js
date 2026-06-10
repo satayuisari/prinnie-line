@@ -12,6 +12,19 @@ const SIGNUP_PROMPT = {
   text: `ยังไม่มีข้อมูลดวงของคุณ 🌙\nกรุณากรอกวันเกิดก่อน เพื่อรับดวงส่วนตัว\n\n👉 ${LIFF_URL}`,
 };
 
+// ปุ่ม quick reply เลือกช่วงเวลา (ติดท้ายข้อความดวง)
+const PERIOD_QR = {
+  items: [
+    { type: 'action', action: { type: 'postback', label: '☀️ รายวัน',     data: 'action=daily',   displayText: 'ดูดวงรายวัน' } },
+    { type: 'action', action: { type: 'postback', label: '📅 รายสัปดาห์', data: 'action=weekly',  displayText: 'ดูดวงรายสัปดาห์' } },
+    { type: 'action', action: { type: 'postback', label: '🗓️ รายเดือน',  data: 'action=monthly', displayText: 'ดูดวงรายเดือน' } },
+    { type: 'action', action: { type: 'postback', label: '✨ รายปี',      data: 'action=annual',  displayText: 'ดูดวงรายปี' } },
+  ],
+};
+function textQR(text) {
+  return { type: 'text', text: text.slice(0, 4900), quickReply: PERIOD_QR };
+}
+
 function formatDaily(reading, nickname) {
   const lines = [`✨ ดวงวันนี้ของ ${nickname || 'คุณ'}`, ''];
   if (reading.has_content) {
@@ -69,7 +82,18 @@ async function handleEvent(event) {
       case 'daily': {
         if (!sub || !sub.chart_data) return replyMessage(event.replyToken, SIGNUP_PROMPT);
         const reading = await horoscope.dailyReading(sub.chart_data, new Date());
-        return replyMessage(event.replyToken, { type: 'text', text: formatDaily(reading, sub.nickname) });
+        return replyMessage(event.replyToken, textQR(formatDaily(reading, sub.nickname)));
+      }
+      case 'weekly':
+      case 'monthly':
+      case 'annual': {
+        if (!sub || !sub.chart_data) return replyMessage(event.replyToken, SIGNUP_PROMPT);
+        const labels = { weekly: '📅 ดวงรายสัปดาห์', monthly: '🗓️ ดวงรายเดือน', annual: '✨ ดวงรายปี' };
+        const reading = await horoscope.periodReading(action);
+        const body = reading
+          ? `${labels[action]} ของ ${sub.nickname || 'คุณ'}\n\n🃏 ${reading.name}\n${reading.text}`
+          : `${labels[action]}\n\nยังไม่มีคำทำนายช่วงนี้`;
+        return replyMessage(event.replyToken, textQR(body));
       }
       case 'natal': {
         if (!sub || !sub.chart_data) return replyMessage(event.replyToken, SIGNUP_PROMPT);

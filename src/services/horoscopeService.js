@@ -86,6 +86,21 @@ async function dailyReading(chart, date = new Date()) {
   };
 }
 
+// ดวงตามช่วงเวลา (weekly/monthly/annual) จาก horoscope_tarot
+// type ในข้อมูล: 'free' | 'weekly' | 'monthly' | 'annual'
+async function periodReading(type) {
+  const r = await db.query(
+    `SELECT h.description, t.name
+     FROM horoscope_tarot h
+     LEFT JOIN tarot t ON t.ext_id = h.tarot_card_map
+     WHERE h.type = $1 AND h.description <> ''
+     ORDER BY random() LIMIT 1`,
+    [type]
+  );
+  if (!r.rows[0]) return null;
+  return { name: r.rows[0].name || 'ไพ่ประจำช่วง', text: stripHtml(r.rows[0].description) };
+}
+
 async function randomTarot() {
   const r = await db.query(
     `SELECT t.name, t.image_id, h.description
@@ -98,4 +113,4 @@ async function randomTarot() {
   return { name: r.rows[0].name || 'ไพ่ประจำวัน', text: stripHtml(r.rows[0].description) };
 }
 
-module.exports = { natalReading, dailyReading, stripHtml };
+module.exports = { natalReading, dailyReading, periodReading, stripHtml };
