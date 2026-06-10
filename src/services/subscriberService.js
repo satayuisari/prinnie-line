@@ -1,0 +1,132 @@
+const db = require('../db');
+const { computeNatalChart } = require('../astro/natalChart');
+const geocoding = require('./geocodingService');
+
+// สมัคร/อัปเดต subscriber พร้อมคำนวณดวงกำเนิดเก็บไว้
+async function upsertSubscriber(input) {
+  const {
+    line_user_id, display_name, picture_url,
+    nickname, birth_date, birth_time, birth_place,
+  } = input;
+
+  if (!line_user_id || !birth_date) {
+    throw new Error('line_user_id และ birth_date จำเป็น');
+  }
+
+  // หาพิกัด + timezone จากชื่อสถานที่ (ถ้าไม่ได้ส่ง lat/lng มาตรง ๆ)
+  let lat = input.lat != null ? Number(input.lat) : null;
+  let lng = input.lng != null ? Number(input.lng) : null;
+  let placeDisplay = birth_place;
+
+  if ((lat == null || lng == null) && birth_place) {
+    const geo = await geocoding.geocode(birth_place);
+    lat = geo.lat;
+    lng = geo.lng;
+    placeDisplay = geo.display_name || birth_place;
+  }
+
+  // คำนวณดวงกำเนิด (timezone/DST อัตโนมัติจากพิกัด) — เก็บใน chart_data
+  const chart = computeNatalChart({
+    date: birth_date,
+    time: birth_time || null,
+    lat,
+    lng,
+  });
+
+  const result = await db.query(
+    `INSERT INTO line_subscribers
+       (line_user_id, display_name, picture_url, nickname,
+        birth_date, birth_time, birth_time_known, birth_place, birth_lat, birth_lng,
+        chart_data, status, created_at, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'PENDING',NOW(),NOW())
+     ON CONFLICT (line_user_id) DO UPDATE SET
+       display_name     = EXCLUDED.display_name,
+       picture_url      = EXCLUDED.picture_url,
+       nickname         = EXCLUDED.nickname,
+       birth_date       = EXCLUDED.birth_date,
+       birth_time       = EXCLUDED.birth_time,
+       birth_time_known = EXCLUDED.birth_time_known,
+       birth_place      = EXCLUDED.birth_place,
+       birth_lat        = EXCLUDED.birth_lat,
+       birth_lng        = EXCLUDED.birth_lng,
+       chart_data       = EXCLUDED.chart_data,
+       updated_at       = NOW()
+     RETURNING id, status, subscribe_end`,
+    [
+      line_user_id, display_name, picture_url, nickname,
+      birth_date, birth_time || null, !!birth_time, placeDisplay,
+      lat, lng,
+      JSON.stringify(chart),
+    ]
+  );
+
+  const row = result.rows[0];
+  return {
+    status:    'SAVED',
+    id:        row.id,
+    sub_status: row.status,
+    chart: { sun: chart.sun, moon: chart.moon, rising: chart.rising, life_path: chart.life_path },
+  };
+}
+
+async function getByLineUserId(line_user_id) {
+  const r = await db.query(
+    'SELECT * FROM line_subscribers WHERE line_user_id = $1', [line_user_id]
+  );
+  return r.rows[0] || null;
+}
+
+async function getMemberStatus(line_user_id) {
+  const sub = await getByLineUserId(line_user_id);
+  if (!sub) return { status: 'NOT_FOUND' };
+
+  const active = sub.subscribe_end && new Date(sub.subscribe_end) > new Date();
+  return {
+    status:      active ? 'ACTIVE' : (sub.chart_data ? 'EXPIRED' : 'PENDING'),
+    nickname:    sub.nickname,
+    expire_date: sub.subscribe_end,
+    has_chart:   !!sub.chart_data,
+  };
+}
+
+// activate / ต่ออายุ +30 วัน
+async function activateSubscription(line_user_id, paymentRef, days = 30) {
+  const sub = await getByLineUserId(line_user_id);
+  if (!sub) throw new Error('ไม่พบ subscriber');
+
+  const base = sub.subscribe_end && new Date(sub.subscribe_end) > new Date()
+    ? new Date(sub.subscribe_end)
+    : new Date();
+  const end = new Date(base);
+  end.setDate(end.getDate() + days);
+
+  await db.query(
+    `UPDATE line_subscribers
+     SET status = 'ACTIVE',
+         subscribe_start = COALESCE(subscribe_start, NOW()),
+         subscribe_end   = $1,
+         payment_ref     = $2,
+         updated_at      = NOW()
+     WHERE line_user_id = $3`,
+    [end.toISOString(), paymentRef || null, line_user_id]
+  );
+
+  return { status: 'ACTIVE', expire_date: end, nickname: sub.nickname };
+}
+
+// subscriber ที่ ACTIVE สำหรับ scheduler
+async function getActiveSubscribers() {
+  const r = await db.query(
+    `SELECT id, line_user_id, nickname, chart_data
+     FROM line_subscribers
+     WHERE subscribe_end > NOW()
+       AND chart_data IS NOT NULL
+     ORDER BY id`
+  );
+  return r.rows;
+}
+
+module.exports = {
+  upsertSubscriber, getByLineUserId, getMemberStatus,
+  activateSubscription, getActiveSubscribers,
+};

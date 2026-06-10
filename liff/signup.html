@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Prinnie333 — ลงทะเบียนดวง</title>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Sarabun','Noto Sans Thai',sans-serif;
+      background: linear-gradient(135deg,#1a0533 0%,#2d0a5a 100%);
+      min-height: 100vh; display: flex; align-items: flex-start; justify-content: center;
+      padding: 24px 16px; color: #fff;
+    }
+    .card {
+      background: rgba(255,255,255,0.07); backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.15); border-radius: 20px;
+      padding: 32px 24px; width: 100%; max-width: 440px;
+    }
+    .logo { text-align:center; font-size:1.8rem; font-weight:700; letter-spacing:2px; color:#e8c4f7; margin-bottom:4px; }
+    .subtitle { text-align:center; font-size:0.9rem; color:rgba(255,255,255,0.6); margin-bottom:26px; }
+    label { display:block; font-size:0.85rem; color:rgba(255,255,255,0.78); margin-bottom:6px; margin-top:4px; }
+    .hint { font-size:0.72rem; color:rgba(255,255,255,0.45); margin:-12px 0 16px; }
+    input {
+      width:100%; padding:12px 14px; border-radius:10px; border:1px solid rgba(255,255,255,0.2);
+      background:rgba(255,255,255,0.08); color:#fff; font-size:1rem; margin-bottom:18px; outline:none;
+      transition:border-color .2s;
+    }
+    input::placeholder { color:rgba(255,255,255,0.35); }
+    input:focus { border-color:#c77dff; }
+    input:disabled { opacity:0.4; }
+    .checkrow { display:flex; align-items:center; gap:8px; margin:-10px 0 18px; }
+    .checkrow input { width:auto; margin:0; }
+    .checkrow label { margin:0; font-size:0.85rem; }
+    .btn {
+      width:100%; padding:14px; border-radius:12px; border:none;
+      background:linear-gradient(90deg,#9b59b6,#c77dff); color:#fff; font-size:1rem;
+      font-weight:600; cursor:pointer; transition:opacity .2s; letter-spacing:.5px;
+    }
+    .btn:disabled { opacity:.5; cursor:not-allowed; }
+    .btn-ghost { background:rgba(255,255,255,0.1); margin-top:12px; }
+    .error { background:rgba(255,80,80,0.15); border:1px solid rgba(255,80,80,0.4); border-radius:10px;
+             padding:12px 14px; font-size:0.85rem; margin-bottom:16px; display:none; }
+    .step { display:none; } .step.active { display:block; }
+    #loading { text-align:center; padding:40px 0; color:rgba(255,255,255,0.6); font-size:0.9rem; }
+    .spinner { width:36px; height:36px; border:3px solid rgba(199,125,255,0.3); border-top-color:#c77dff;
+               border-radius:50%; animation:spin .8s linear infinite; margin:0 auto 12px; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .chartbox { background:rgba(199,125,255,0.15); border:1px solid rgba(199,125,255,0.4);
+                border-radius:14px; padding:20px; margin-bottom:20px; }
+    .chartrow { display:flex; justify-content:space-between; padding:6px 0; font-size:1rem; border-bottom:1px solid rgba(255,255,255,0.08); }
+    .chartrow:last-child { border:none; }
+    .chartrow .v { color:#e8c4f7; font-weight:700; }
+    .success-icon { font-size:3rem; text-align:center; margin-bottom:12px; }
+    .success-title { font-size:1.3rem; font-weight:700; text-align:center; color:#e8c4f7; margin-bottom:8px; }
+    .success-body { text-align:center; color:rgba(255,255,255,0.7); font-size:0.9rem; line-height:1.6; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">✦ PRINNIE333</div>
+  <div class="subtitle">ลงทะเบียนวันเกิด เพื่อรับดวงส่วนตัว</div>
+
+  <div id="loading"><div class="spinner"></div>กำลังโหลด...</div>
+
+  <!-- Step 1: ฟอร์มข้อมูลเกิด -->
+  <div class="step" id="step-form">
+    <div class="error" id="form-error"></div>
+
+    <label>ชื่อเล่น</label>
+    <input type="text" id="nickname" placeholder="เช่น บอน" maxlength="50" />
+
+    <label>วันเกิด</label>
+    <input type="date" id="birth_date" />
+
+    <label>เวลาเกิด</label>
+    <input type="time" id="birth_time" />
+    <div class="checkrow">
+      <input type="checkbox" id="time_unknown" onchange="toggleTime()" />
+      <label for="time_unknown">ไม่ทราบเวลาเกิด (จะคำนวณลัคนาไม่ได้)</label>
+    </div>
+
+    <label>สถานที่เกิด (จังหวัด/เมือง)</label>
+    <input type="text" id="birth_place" placeholder="เช่น กรุงเทพมหานคร" />
+    <div class="hint">ใช้คำนวณลัคนาและ timezone — พิมพ์ชื่อจังหวัดหรือเมืองได้เลย</div>
+
+    <button class="btn" id="btn-submit" onclick="submitForm()">คำนวณดวงของฉัน →</button>
+  </div>
+
+  <!-- Step 2: ผลดวง + สมัคร -->
+  <div class="step" id="step-result">
+    <div class="chartbox" id="chartbox"></div>
+    <button class="btn" onclick="goToPayment()">สมัครสมาชิก 399 บาท/เดือน →</button>
+    <button class="btn btn-ghost" onclick="showStep('step-form')">แก้ไขข้อมูลเกิด</button>
+  </div>
+
+  <!-- Step 3: สำเร็จ -->
+  <div class="step" id="step-success">
+    <div class="success-icon">✨</div>
+    <div class="success-title" id="success-title">ลงทะเบียนสำเร็จ!</div>
+    <div class="success-body" id="success-body">ดวงส่วนตัวจะถูกส่งทุกเช้า 08:00 น.<br/>ปิดหน้าต่างนี้ได้เลย</div>
+  </div>
+</div>
+
+<script>
+  const BACKEND_URL = 'https://your-backend.com';  // เปลี่ยนเป็น URL จริง
+  const LIFF_ID     = 'YOUR_LIFF_ID';              // เปลี่ยนเป็น LIFF ID จริง
+
+  let profile = null;
+
+  async function initLiff() {
+    await liff.init({ liffId: LIFF_ID });
+    if (!liff.isLoggedIn()) { liff.login(); return; }
+    profile = await liff.getProfile();
+
+    // เช็กสถานะสมาชิก
+    try {
+      const r = await fetch(`${BACKEND_URL}/api/line/member-status?line_user_id=${profile.userId}`);
+      const s = await r.json();
+      if (s.status === 'ACTIVE') {
+        setSuccess('คุณเป็นสมาชิกอยู่แล้ว ✅', `ยินดีต้อนรับกลับ ${s.nickname || ''}!\nดวงส่งทุกเช้า 08:00 น.`);
+        return;
+      }
+    } catch (_) {}
+
+    // เติมชื่อเล่นจาก LINE ให้อัตโนมัติ
+    document.getElementById('nickname').value = profile.displayName || '';
+    showStep('step-form');
+  }
+
+  function toggleTime() {
+    const unknown = document.getElementById('time_unknown').checked;
+    const t = document.getElementById('birth_time');
+    t.disabled = unknown;
+    if (unknown) t.value = '';
+  }
+
+  async function submitForm() {
+    const nickname    = document.getElementById('nickname').value.trim();
+    const birth_date  = document.getElementById('birth_date').value;
+    const unknown     = document.getElementById('time_unknown').checked;
+    const birth_time  = unknown ? null : document.getElementById('birth_time').value;
+    const birth_place = document.getElementById('birth_place').value.trim();
+
+    if (!birth_date)  return showError('กรุณาเลือกวันเกิด');
+    if (!birth_place) return showError('กรุณากรอกสถานที่เกิด');
+    if (!unknown && !birth_time) return showError('กรุณากรอกเวลาเกิด หรือเลือก "ไม่ทราบเวลา"');
+
+    const btn = document.getElementById('btn-submit');
+    btn.disabled = true; btn.textContent = 'กำลังคำนวณ...';
+
+    try {
+      const r = await fetch(`${BACKEND_URL}/api/line/signup`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          line_user_id: profile.userId,
+          display_name: profile.displayName,
+          picture_url:  profile.pictureUrl,
+          nickname, birth_date, birth_time, birth_place,
+        }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'เกิดข้อผิดพลาด');
+
+      renderChart(data.chart, nickname);
+      showStep('step-result');
+    } catch (err) {
+      showError(err.message);
+    } finally {
+      btn.disabled = false; btn.textContent = 'คำนวณดวงของฉัน →';
+    }
+  }
+
+  function renderChart(c, nickname) {
+    document.getElementById('chartbox').innerHTML = `
+      <div style="text-align:center;font-weight:700;color:#e8c4f7;margin-bottom:14px;">
+        🌟 ดวงกำเนิดของ ${nickname || 'คุณ'}
+      </div>
+      <div class="chartrow"><span>☀️ อาทิตย์</span><span class="v">${signTH(c.sun)}</span></div>
+      <div class="chartrow"><span>🌙 จันทร์</span><span class="v">${signTH(c.moon)}</span></div>
+      <div class="chartrow"><span>⬆️ ลัคนา</span><span class="v">${c.rising ? signTH(c.rising) : 'ไม่ระบุ (ไม่ทราบเวลา)'}</span></div>
+      <div class="chartrow"><span>🔢 เลขชีวิต</span><span class="v">${c.life_path}</span></div>`;
+  }
+
+  const TH = { Aries:'เมษ',Taurus:'พฤษภ',Gemini:'เมถุน',Cancer:'กรกฎ',Leo:'สิงห์',Virgo:'กันย์',
+               Libra:'ตุลย์',Scorpio:'พิจิก',Sagittarius:'ธนู',Capricorn:'มังกร',Aquarius:'กุมภ์',Pisces:'มีน' };
+  function signTH(s) { return s ? (TH[s] || s) : '-'; }
+
+  function goToPayment() {
+    const url = `https://your-payment.com/checkout?line_user_id=${encodeURIComponent(profile.userId)}&plan=PRINNIE_399`;
+    liff.openWindow({ url, external: false });
+  }
+
+  function setSuccess(title, body) {
+    document.getElementById('success-title').textContent = title;
+    document.getElementById('success-body').textContent  = body;
+    showStep('step-success');
+  }
+  function showStep(id) {
+    document.getElementById('loading').style.display = 'none';
+    document.querySelectorAll('.step').forEach(el => el.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+  }
+  function showError(msg) {
+    const el = document.getElementById('form-error');
+    el.textContent = msg; el.style.display = 'block';
+  }
+
+  initLiff().catch(err => {
+    document.getElementById('loading').textContent = 'เกิดข้อผิดพลาด: ' + err.message;
+  });
+</script>
+</body>
+</html>

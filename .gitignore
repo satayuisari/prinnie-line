@@ -1,0 +1,9 @@
+node_modules/
+.env
+richmenu/.richmenu-id
+*.log
+
+.pglite-data/
+
+tools/
+_skill_inspect/

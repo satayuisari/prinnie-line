@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2500" height="1686" viewBox="0 0 2500 1686" font-family="'Sarabun','Noto Sans Thai',sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1a0533"/>
+      <stop offset="100%" stop-color="#2d0a5a"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#9b59b6"/>
+      <stop offset="100%" stop-color="#c77dff"/>
+    </linearGradient>
+    <filter id="glow"><feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+
+  <rect width="2500" height="1686" fill="url(#bg)"/>
+
+  <!-- เส้นแบ่ง 6 ช่อง -->
+  <g stroke="#ffffff" stroke-opacity="0.12" stroke-width="2">
+    <line x1="833"  y1="60" x2="833"  y2="1626"/>
+    <line x1="1667" y1="60" x2="1667" y2="1626"/>
+    <line x1="60"   y1="843" x2="2440" y2="843"/>
+  </g>
+
+  <!-- helper: แต่ละช่อง center x = 416.5 / 1250 / 2083.5 ; center y = 421 / 1264 -->
+  <g text-anchor="middle" fill="#ffffff">
+    <!-- Row 1 -->
+    <text x="416"  y="380" font-size="170" filter="url(#glow)">🔮</text>
+    <text x="416"  y="540" font-size="76" font-weight="700" fill="#e8c4f7">ดูดวงวันนี้</text>
+
+    <text x="1250" y="380" font-size="170" filter="url(#glow)">🌟</text>
+    <text x="1250" y="540" font-size="76" font-weight="700" fill="#e8c4f7">พื้นดวงของฉัน</text>
+
+    <text x="2083" y="380" font-size="170" filter="url(#glow)">🃏</text>
+    <text x="2083" y="540" font-size="76" font-weight="700" fill="#e8c4f7">ไพ่ทาโรต์</text>
+
+    <!-- Row 2 -->
+    <text x="416"  y="1223" font-size="170" filter="url(#glow)">💎</text>
+    <text x="416"  y="1383" font-size="76" font-weight="700" fill="#e8c4f7">สมัคร / ต่ออายุ</text>
+
+    <text x="1250" y="1223" font-size="170" filter="url(#glow)">👤</text>
+    <text x="1250" y="1383" font-size="76" font-weight="700" fill="#e8c4f7">โปรไฟล์ของฉัน</text>
+
+    <text x="2083" y="1223" font-size="170" filter="url(#glow)">📖</text>
+    <text x="2083" y="1383" font-size="76" font-weight="700" fill="#e8c4f7">วิธีใช้งาน</text>
+  </g>
+
+  <!-- แถบโลโก้บนสุด -->
+  <rect x="0" y="0" width="2500" height="8" fill="url(#accent)"/>
+</svg>

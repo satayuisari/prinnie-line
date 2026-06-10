@@ -1,0 +1,32 @@
+{
+  "size": { "width": 2500, "height": 1686 },
+  "selected": true,
+  "name": "Prinnie333 Main Menu",
+  "chatBarText": "เมนูดูดวง ✨",
+  "areas": [
+    {
+      "bounds": { "x": 0, "y": 0, "width": 833, "height": 843 },
+      "action": { "type": "postback", "data": "action=daily", "displayText": "ดูดวงวันนี้" }
+    },
+    {
+      "bounds": { "x": 833, "y": 0, "width": 834, "height": 843 },
+      "action": { "type": "postback", "data": "action=natal", "displayText": "พื้นดวงของฉัน" }
+    },
+    {
+      "bounds": { "x": 1667, "y": 0, "width": 833, "height": 843 },
+      "action": { "type": "postback", "data": "action=tarot", "displayText": "ไพ่ทาโรต์วันนี้" }
+    },
+    {
+      "bounds": { "x": 0, "y": 843, "width": 833, "height": 843 },
+      "action": { "type": "uri", "uri": "https://liff.line.me/YOUR_LIFF_ID" }
+    },
+    {
+      "bounds": { "x": 833, "y": 843, "width": 834, "height": 843 },
+      "action": { "type": "postback", "data": "action=profile", "displayText": "โปรไฟล์ของฉัน" }
+    },
+    {
+      "bounds": { "x": 1667, "y": 843, "width": 833, "height": 843 },
+      "action": { "type": "postback", "data": "action=help", "displayText": "วิธีใช้งาน" }
+    }
+  ]
+}
