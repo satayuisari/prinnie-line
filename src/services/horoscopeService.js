@@ -54,13 +54,21 @@ async function westernText(planet, sign) {
   return r.rows[0] ? stripHtml(r.rows[0].prediction) : null;
 }
 
-// ===== ดวงรายวัน (transit) =====
-// คำนวณดาวจรวันนี้ทำมุมกับดาวกำเนิด → ดึงคำทำนาย
-async function dailyReading(chart, date = new Date()) {
-  const transiting = transitingPositions(date);
-  const aspects    = transitAspects(transiting, chart.planets);
+// ===== ดาวจร (transit) =====
+// แยกดาวตามความเร็ว → ใช้กำหนดช่วงเวลา
+//   ดาวเร็ว (จันทร์/อาทิตย์/พุธ/ศุกร์/อังคาร) เปลี่ยนมุมรายวัน → ดวงรายวัน
+//   ดาวกลาง (อาทิตย์..พฤหัส) → รายเดือน
+//   ดาวช้า (พฤหัส/เสาร์/ยูเรนัส/เนปจูน/พลูโต) อิทธิพลยาว → รายปี
+const FAST   = ['Moon', 'Sun', 'Mercury', 'Venus', 'Mars'];
+const MEDIUM = ['Sun', 'Mercury', 'Venus', 'Mars', 'Jupiter'];
+const SLOW   = ['Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto'];
 
-  // ดึงคำทำนายของแต่ละมุม เลือกเฉพาะที่มีเนื้อหา
+// คำนวณมุมดาวจร→ดาวกำเนิด เฉพาะดาวใน planetFilter แล้วดึงคำทำนายที่มีเนื้อหา
+async function transitReading(chart, date, planetFilter, limit = 3) {
+  const transiting = transitingPositions(date);
+  let aspects = transitAspects(transiting, chart.planets);
+  if (planetFilter) aspects = aspects.filter(a => planetFilter.includes(a.aspecting_planet));
+
   const readings = [];
   for (const a of aspects) {
     const r = await db.query(
@@ -71,24 +79,14 @@ async function dailyReading(chart, date = new Date()) {
     const text = r.rows[0] ? stripHtml(r.rows[0].prediction) : '';
     if (text) {
       readings.push({ ...a, text });
-      if (readings.length >= 3) break;   // เอา 3 มุมที่แม่นที่สุดที่มีเนื้อหา
+      if (readings.length >= limit) break;
     }
   }
-
-  // ไพ่ประจำวัน (สุ่ม)
-  const tarot = await randomTarot();
-
-  return {
-    date: date.toISOString().slice(0, 10),
-    aspects: readings,
-    tarot,
-    has_content: readings.length > 0,
-  };
+  return readings;
 }
 
-// ดวงตามช่วงเวลา (weekly/monthly/annual) จาก horoscope_tarot
-// type ในข้อมูล: 'free' | 'weekly' | 'monthly' | 'annual'
-async function periodReading(type) {
+// ไพ่ตามช่วง (free/weekly/monthly/annual)
+async function tarotByType(type) {
   const r = await db.query(
     `SELECT h.description, t.name
      FROM horoscope_tarot h
@@ -101,16 +99,24 @@ async function periodReading(type) {
   return { name: r.rows[0].name || 'ไพ่ประจำช่วง', text: stripHtml(r.rows[0].description) };
 }
 
-async function randomTarot() {
-  const r = await db.query(
-    `SELECT t.name, t.image_id, h.description
-     FROM horoscope_tarot h
-     LEFT JOIN tarot t ON t.ext_id = h.tarot_card_map
-     WHERE h.type IN ('weekly', 'free') AND h.description <> ''
-     ORDER BY random() LIMIT 1`
-  );
-  if (!r.rows[0]) return null;
-  return { name: r.rows[0].name || 'ไพ่ประจำวัน', text: stripHtml(r.rows[0].description) };
+// ===== ดวงรายวัน = ดาวเร็วทำมุมวันนี้ + ไพ่ =====
+async function dailyReading(chart, date = new Date()) {
+  const aspects = await transitReading(chart, date, FAST, 3);
+  const tarot   = await tarotByType('free');
+  return { date: date.toISOString().slice(0, 10), aspects, tarot, has_content: aspects.length > 0 };
 }
 
-module.exports = { natalReading, dailyReading, periodReading, stripHtml };
+// ===== รายสัปดาห์/เดือน/ปี = ดาวจร (ตามชุดความเร็ว) + ไพ่ประจำช่วง =====
+const PERIOD_CFG = {
+  weekly:  { planets: FAST,   tarot: 'weekly'  },
+  monthly: { planets: MEDIUM, tarot: 'monthly' },
+  annual:  { planets: SLOW,   tarot: 'annual'  },
+};
+async function periodReading(period, chart, date = new Date()) {
+  const cfg     = PERIOD_CFG[period] || PERIOD_CFG.monthly;
+  const aspects = await transitReading(chart, date, cfg.planets, 3);
+  const tarot   = await tarotByType(cfg.tarot);
+  return { period, aspects, tarot, has_content: aspects.length > 0 || !!tarot };
+}
+
+module.exports = { natalReading, dailyReading, periodReading, tarotByType, stripHtml };

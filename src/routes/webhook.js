@@ -25,14 +25,15 @@ function textQR(text) {
   return { type: 'text', text: text.slice(0, 4900), quickReply: PERIOD_QR };
 }
 
-function formatDaily(reading, nickname) {
-  const lines = [`✨ ดวงวันนี้ของ ${nickname || 'คุณ'}`, ''];
-  if (reading.has_content) {
-    reading.aspects.forEach(a => lines.push(`🔮 ${a.text}`, ''));
+function formatReading(reading, title, nickname) {
+  const lines = [`${title} ของ ${nickname || 'คุณ'}`, ''];
+  if (reading.aspects && reading.aspects.length) {
+    lines.push('🌟 ดาวจร');
+    reading.aspects.forEach(a => lines.push(a.text, ''));
   } else {
-    lines.push('วันนี้ดวงดาวสงบ ไม่มีมุมเด่นกระทบดวงกำเนิด', '');
+    lines.push('🌟 ช่วงนี้ดวงดาวค่อนข้างสงบ ไม่มีมุมเด่น', '');
   }
-  if (reading.tarot) lines.push(`🃏 ${reading.tarot.name}`, reading.tarot.text);
+  if (reading.tarot) lines.push('🃏 ' + reading.tarot.name, reading.tarot.text);
   return lines.join('\n').trim();
 }
 
@@ -82,18 +83,15 @@ async function handleEvent(event) {
       case 'daily': {
         if (!sub || !sub.chart_data) return replyMessage(event.replyToken, SIGNUP_PROMPT);
         const reading = await horoscope.dailyReading(sub.chart_data, new Date());
-        return replyMessage(event.replyToken, textQR(formatDaily(reading, sub.nickname)));
+        return replyMessage(event.replyToken, textQR(formatReading(reading, '✨ ดวงวันนี้', sub.nickname)));
       }
       case 'weekly':
       case 'monthly':
       case 'annual': {
         if (!sub || !sub.chart_data) return replyMessage(event.replyToken, SIGNUP_PROMPT);
         const labels = { weekly: '📅 ดวงรายสัปดาห์', monthly: '🗓️ ดวงรายเดือน', annual: '✨ ดวงรายปี' };
-        const reading = await horoscope.periodReading(action);
-        const body = reading
-          ? `${labels[action]} ของ ${sub.nickname || 'คุณ'}\n\n🃏 ${reading.name}\n${reading.text}`
-          : `${labels[action]}\n\nยังไม่มีคำทำนายช่วงนี้`;
-        return replyMessage(event.replyToken, textQR(body));
+        const reading = await horoscope.periodReading(action, sub.chart_data, new Date());
+        return replyMessage(event.replyToken, textQR(formatReading(reading, labels[action], sub.nickname)));
       }
       case 'natal': {
         if (!sub || !sub.chart_data) return replyMessage(event.replyToken, SIGNUP_PROMPT);
