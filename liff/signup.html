@@ -111,7 +111,11 @@
 
   async function initLiff() {
     await liff.init({ liffId: LIFF_ID });
-    if (!liff.isLoggedIn()) { liff.login(); return; }
+    // ใน LINE app ไม่ต้อง login (มี session อยู่แล้ว) — เรียก login เฉพาะเปิดนอกแอป
+    if (!liff.isLoggedIn() && !liff.isInClient()) {
+      liff.login({ redirectUri: location.href });
+      return;
+    }
     profile = await liff.getProfile();
 
     // เช็กสถานะสมาชิก
@@ -208,7 +212,10 @@
   }
 
   initLiff().catch(err => {
-    document.getElementById('loading').textContent = 'เกิดข้อผิดพลาด: ' + err.message;
+    const msg = (err && (err.message || err.code)) ? (err.message || err.code) : String(err);
+    document.body.innerHTML =
+      '<div style="padding:28px;color:#fff;font-family:sans-serif;background:#2d0a5a;min-height:100vh">' +
+      '<h3 style="color:#e8c4f7">⚠️ เกิดข้อผิดพลาด</h3><p style="word-break:break-all">' + msg + '</p></div>';
   });
 </script>
 </body>
