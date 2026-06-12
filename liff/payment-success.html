@@ -11,16 +11,26 @@
     .card { text-align:center; max-width:380px; }
     .icon { font-size:4rem; margin-bottom:12px; }
     h1 { color:#e8c4f7; font-size:1.5rem; margin:0 0 10px; }
-    p { color:rgba(255,255,255,0.75); line-height:1.7; }
+    p { color:rgba(255,255,255,0.75); line-height:1.7; margin-bottom:24px; }
+    .btn { display:inline-block; padding:14px 28px; border-radius:12px;
+      background:linear-gradient(90deg,#06C755,#05a648); color:#fff; font-weight:700;
+      text-decoration:none; font-size:1rem; }
+    .hint { margin-top:16px; font-size:0.8rem; color:rgba(255,255,255,0.45); }
   </style>
 </head>
 <body>
   <div class="card">
     <div class="icon">✨</div>
     <h1>ชำระเงินสำเร็จ!</h1>
-    <p>ยินดีต้อนรับสู่สมาชิก Prinnie333<br/>
-       คุณจะได้รับดวงประจำวันทุกเช้า 08:00 น.<br/><br/>
-       <strong style="color:#e8c4f7">กลับไปที่แชท LINE แล้วกดเมนูดูดวงได้เลย</strong></p>
+    <p>ยินดีต้อนรับสู่สมาชิก Prinnie333<br/>รับดวงประจำวันทุกเช้า 08:00 น.</p>
+    <a class="btn" id="backBtn" href="https://line.me/R/ti/p/@024nbaio">กลับไปแชท Prinnie333 →</a>
+    <div class="hint">กำลังพากลับ LINE อัตโนมัติ...</div>
   </div>
+  <script>
+    // LINE OA ทดสอบ = @024nbaio (ตอนย้าย OA จริง เปลี่ยน basic ID ตรงนี้)
+    const OA = 'https://line.me/R/ti/p/@024nbaio';
+    document.getElementById('backBtn').href = OA;
+    setTimeout(() => { window.location.href = OA; }, 2500);
+  </script>
 </body>
 </html>
