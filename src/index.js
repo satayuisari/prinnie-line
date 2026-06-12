@@ -7,6 +7,7 @@ const bodyParser = require('body-parser');
 const lineRoutes    = require('./routes/line');
 const paymentRoutes = require('./routes/payment');
 const webhook       = require('./routes/webhook');
+const stripeWebhook = require('./routes/stripeWebhook');
 const scheduler     = require('./scheduler/dailyHoroscope');
 
 const app  = express();
@@ -14,8 +15,9 @@ const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 
-// ⚠️ webhook ต้อง register ก่อน bodyParser.json() — LINE signature ใช้ raw body
-webhook.register(app);
+// ⚠️ webhook ต้อง register ก่อน bodyParser.json() — ใช้ raw body ตรวจลายเซ็น
+webhook.register(app);        // LINE
+stripeWebhook.register(app);  // Stripe
 
 app.use(bodyParser.json());
 app.use(express.static('liff'));

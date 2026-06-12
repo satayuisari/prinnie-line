@@ -1,7 +1,21 @@
-const express     = require('express');
-const router      = express.Router();
-const subscribers = require('../services/subscriberService');
+const express       = require('express');
+const router        = express.Router();
+const subscribers   = require('../services/subscriberService');
 const lineMessaging = require('../services/lineMessaging');
+const stripeService = require('../services/stripeService');
+
+// POST /api/payment/create-checkout — สร้างหน้าจ่ายเงิน Stripe
+router.post('/create-checkout', async (req, res) => {
+  const { line_user_id } = req.body;
+  if (!line_user_id) return res.status(400).json({ error: 'line_user_id required' });
+  try {
+    const url = await stripeService.createCheckout(line_user_id);
+    res.json({ url });
+  } catch (err) {
+    console.error('[create-checkout]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // POST /api/payment/webhook
 // Payment gateway เรียกเมื่อจ่ายสำเร็จ → activate +30 วัน

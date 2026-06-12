@@ -199,9 +199,22 @@
                Libra:'ตุลย์',Scorpio:'พิจิก',Sagittarius:'ธนู',Capricorn:'มังกร',Aquarius:'กุมภ์',Pisces:'มีน' };
   function signTH(s) { return s ? (TH[s] || s) : '-'; }
 
-  function goToPayment() {
-    const url = `https://your-payment.com/checkout?line_user_id=${encodeURIComponent(profile.userId)}&plan=PRINNIE_399`;
-    liff.openWindow({ url, external: false });
+  async function goToPayment() {
+    const btn = document.getElementById('payBtn');
+    btn.disabled = true; btn.textContent = 'กำลังเปิดหน้าจ่ายเงิน...';
+    try {
+      const r = await fetch(`${BACKEND_URL}/api/payment/create-checkout`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ line_user_id: profile.userId }),
+      });
+      const d = await r.json();
+      if (!r.ok || !d.url) throw new Error(d.error || 'สร้างหน้าจ่ายเงินไม่สำเร็จ');
+      liff.openWindow({ url: d.url, external: true });   // เปิด Stripe ในเบราว์เซอร์
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      btn.disabled = false; btn.textContent = 'สมัครสมาชิก 399 บาท/เดือน →';
+    }
   }
 
   function setSuccess(title, body) {
