@@ -37,6 +37,16 @@ function formatReading(reading, title, nickname) {
   return lines.join('\n').trim();
 }
 
+// สร้าง array ข้อความ: ถ้ามีรูปไพ่ → ส่งรูปนำหน้า แล้วตามด้วยข้อความ+quick reply
+function buildMessages(reading, title, nickname) {
+  const msgs = [];
+  if (reading.tarot && reading.tarot.image) {
+    msgs.push({ type: 'image', originalContentUrl: reading.tarot.image, previewImageUrl: reading.tarot.image });
+  }
+  msgs.push(textQR(formatReading(reading, title, nickname)));
+  return msgs;
+}
+
 function formatNatal(r) {
   const parts = [
     `🌟 พื้นดวงของคุณ`,
@@ -83,7 +93,7 @@ async function handleEvent(event) {
       case 'daily': {
         if (!sub || !sub.chart_data) return replyMessage(event.replyToken, SIGNUP_PROMPT);
         const reading = await horoscope.dailyReading(sub.chart_data, new Date());
-        return replyMessage(event.replyToken, textQR(formatReading(reading, '✨ ดวงวันนี้', sub.nickname)));
+        return replyMessage(event.replyToken, buildMessages(reading, '✨ ดวงวันนี้', sub.nickname));
       }
       case 'weekly':
       case 'monthly':
@@ -91,7 +101,7 @@ async function handleEvent(event) {
         if (!sub || !sub.chart_data) return replyMessage(event.replyToken, SIGNUP_PROMPT);
         const labels = { weekly: '📅 ดวงรายสัปดาห์', monthly: '🗓️ ดวงรายเดือน', annual: '✨ ดวงรายปี' };
         const reading = await horoscope.periodReading(action, sub.chart_data, new Date());
-        return replyMessage(event.replyToken, textQR(formatReading(reading, labels[action], sub.nickname)));
+        return replyMessage(event.replyToken, buildMessages(reading, labels[action], sub.nickname));
       }
       case 'natal': {
         if (!sub || !sub.chart_data) return replyMessage(event.replyToken, SIGNUP_PROMPT);
@@ -100,12 +110,12 @@ async function handleEvent(event) {
       }
       case 'tarot': {
         if (!sub || !sub.chart_data) return replyMessage(event.replyToken, SIGNUP_PROMPT);
-        const reading = await horoscope.dailyReading(sub.chart_data, new Date());
-        const t = reading.tarot;
-        return replyMessage(event.replyToken, {
-          type: 'text',
-          text: t ? `🃏 ${t.name}\n\n${t.text}` : 'ไม่มีไพ่ในขณะนี้',
-        });
+        const t = await horoscope.tarotByType('free');
+        if (!t) return replyMessage(event.replyToken, { type: 'text', text: 'ไม่มีไพ่ในขณะนี้' });
+        const msgs = [];
+        if (t.image) msgs.push({ type: 'image', originalContentUrl: t.image, previewImageUrl: t.image });
+        msgs.push({ type: 'text', text: `🃏 ${t.name}\n\n${t.text}`.slice(0, 4900) });
+        return replyMessage(event.replyToken, msgs);
       }
       case 'profile': {
         if (!sub) return replyMessage(event.replyToken, SIGNUP_PROMPT);

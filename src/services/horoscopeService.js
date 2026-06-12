@@ -88,7 +88,7 @@ async function transitReading(chart, date, planetFilter, limit = 3) {
 // ไพ่ตามช่วง (free/weekly/monthly/annual)
 async function tarotByType(type) {
   const r = await db.query(
-    `SELECT h.description, t.name
+    `SELECT h.description, t.name, t.image_id
      FROM horoscope_tarot h
      LEFT JOIN tarot t ON t.ext_id = h.tarot_card_map
      WHERE h.type = $1 AND h.description <> ''
@@ -96,7 +96,10 @@ async function tarotByType(type) {
     [type]
   );
   if (!r.rows[0]) return null;
-  return { name: r.rows[0].name || 'ไพ่ประจำช่วง', text: stripHtml(r.rows[0].description) };
+  const image = r.rows[0].image_id
+    ? `https://data.prinnie333.com/assets/${r.rows[0].image_id}`   // รูปไพ่เดิมจาก Directus
+    : null;
+  return { name: r.rows[0].name || 'ไพ่ประจำช่วง', text: stripHtml(r.rows[0].description), image };
 }
 
 // ===== ดวงรายวัน = ดาวเร็วทำมุมวันนี้ + ไพ่ =====
