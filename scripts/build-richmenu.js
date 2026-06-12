@@ -1,30 +1,37 @@
-// Render rich menu SVG → PNG ขนาด 2500x1686 เป๊ะ (ตรง tap zone)
-// ใช้ @resvg/resvg-js (โหลด Thai font จากระบบ) — ไม่ยืด ไม่พึ่ง Canva
-//
+// Render rich menu: ไอคอน/ข้อความ (SVG via resvg, โปร่งใส) → composite ทับพื้นหลัง AI (sharp)
 //   node scripts/build-richmenu.js
-
-const fs   = require('fs');
-const path = require('path');
+const fs    = require('fs');
+const path  = require('path');
 const { Resvg } = require('@resvg/resvg-js');
+const sharp = require('sharp');
 
 const DIR     = path.join(__dirname, '..', 'richmenu');
 const svgPath = path.join(DIR, 'richmenu.svg');
-const pngPath = path.join(DIR, 'richmenu.png');
+const bgPath  = path.join(DIR, 'bg.png');
+const outPath = path.join(DIR, 'richmenu.jpg');
 
-const svg   = fs.readFileSync(svgPath);
-const resvg = new Resvg(svg, {
-  fitTo: { mode: 'width', value: 2500 },   // SVG เป็น 2500x1686 อยู่แล้ว → ได้ขนาดเป๊ะ
-  font:  { loadSystemFonts: true },          // ใช้ฟอนต์ไทยจาก Windows (Leelawadee)
-});
+(async () => {
+  // 1) render ไอคอน+ข้อความ เป็นเลเยอร์โปร่งใส
+  const svg   = fs.readFileSync(svgPath);
+  const resvg = new Resvg(svg, { fitTo: { mode: 'width', value: 2500 }, font: { loadSystemFonts: true } });
+  const overlay = resvg.render().asPng();
 
-const img = resvg.render();
-const png = img.asPng();
-fs.writeFileSync(pngPath, png);
+  // 2) พื้นหลัง AI (resize cover 2500x1686) + วางเลเยอร์ทับ → JPEG
+  let out;
+  if (fs.existsSync(bgPath)) {
+    out = await sharp(bgPath)
+      .resize(2500, 1686, { fit: 'cover' })
+      .composite([{ input: overlay }])
+      .jpeg({ quality: 90 })
+      .toBuffer();
+    console.log('composite: bg.png + ไอคอน/ข้อความ');
+  } else {
+    out = await sharp(overlay).flatten({ background: '#1a0533' }).jpeg({ quality: 90 }).toBuffer();
+    console.log('⚠️ ไม่มี bg.png — ใช้พื้นทึบ');
+  }
 
-const kb = (png.length / 1024).toFixed(1);
-console.log(`✅ render เสร็จ: richmenu.png  ${img.width}x${img.height}  ${kb} KB`);
-if (png.length > 1024 * 1024) {
-  console.log('⚠️  เกิน 1MB — รัน compress (PowerShell System.Drawing → JPEG) ต่อ');
-} else {
-  console.log('   ขนาดไฟล์ผ่านลิมิต LINE (<1MB) ใช้ได้เลย');
-}
+  fs.writeFileSync(outPath, out);
+  fs.rmSync(path.join(DIR, 'richmenu.png'), { force: true });  // กันหยิบไฟล์เก่า
+  const kb = (out.length / 1024).toFixed(1);
+  console.log(`✅ richmenu.jpg  2500x1686  ${kb} KB ` + (out.length < 1024 * 1024 ? '(< 1MB ✅)' : '⚠️ เกิน 1MB'));
+})().catch(e => { console.error(e.message); process.exit(1); });
