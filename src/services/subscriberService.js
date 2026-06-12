@@ -61,10 +61,19 @@ async function upsertSubscriber(input) {
   );
 
   const row = result.rows[0];
+  let subStatus = row.status;
+
+  // โหมดเทสฟรี: เปิดใช้งานทันทีไม่ต้องจ่าย (ตั้ง FREE_ACCESS=true)
+  if (process.env.FREE_ACCESS === 'true') {
+    await activateSubscription(line_user_id, 'free-trial', 30);
+    subStatus = 'ACTIVE';
+  }
+
   return {
     status:    'SAVED',
     id:        row.id,
-    sub_status: row.status,
+    sub_status: subStatus,
+    free_access: process.env.FREE_ACCESS === 'true',
     chart: { sun: chart.sun, moon: chart.moon, rising: chart.rising, life_path: chart.life_path },
   };
 }

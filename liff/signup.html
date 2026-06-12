@@ -91,7 +91,7 @@
   <!-- Step 2: ผลดวง + สมัคร -->
   <div class="step" id="step-result">
     <div class="chartbox" id="chartbox"></div>
-    <button class="btn" onclick="goToPayment()">สมัครสมาชิก 399 บาท/เดือน →</button>
+    <button class="btn" id="payBtn" onclick="goToPayment()">สมัครสมาชิก 399 บาท/เดือน →</button>
     <button class="btn btn-ghost" onclick="showStep('step-form')">แก้ไขข้อมูลเกิด</button>
   </div>
 
@@ -168,6 +168,14 @@
       if (!r.ok) throw new Error(data.error || 'เกิดข้อผิดพลาด');
 
       renderChart(data.chart, nickname);
+      // โหมดเทสฟรี: เปิดใช้งานแล้ว ไม่ต้องจ่าย
+      if (data.free_access || data.sub_status === 'ACTIVE') {
+        const btn = document.getElementById('payBtn');
+        btn.textContent = '✅ เริ่มใช้งานเลย';
+        btn.onclick = () => { try { liff.closeWindow(); } catch (_) {} };
+        document.getElementById('chartbox').insertAdjacentHTML('beforeend',
+          '<div style="text-align:center;margin-top:14px;color:#9be89b;font-size:0.88rem">🎉 เปิดใช้งานฟรี (ช่วงทดสอบ)<br/>ปิดหน้านี้แล้วกดเมนูดูดวงได้เลย</div>');
+      }
       showStep('step-result');
     } catch (err) {
       showError(err.message);
