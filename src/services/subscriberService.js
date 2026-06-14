@@ -86,7 +86,17 @@ async function getByLineUserId(line_user_id) {
 }
 
 async function getMemberStatus(line_user_id) {
-  const sub = await getByLineUserId(line_user_id);
+  // ดึง birth_date/birth_time แบบ format string เพื่อให้ฟอร์ม LIFF prefill ได้ตรง
+  // (เลี่ยงปัญหา timezone ของ DATE/TIME type ตอนแปลงเป็น YYYY-MM-DD / HH:MM)
+  const r = await db.query(
+    `SELECT nickname, subscribe_end, chart_data, birth_place,
+            birth_time_known,
+            to_char(birth_date, 'YYYY-MM-DD') AS birth_date,
+            to_char(birth_time, 'HH24:MI')    AS birth_time
+     FROM line_subscribers WHERE line_user_id = $1`,
+    [line_user_id]
+  );
+  const sub = r.rows[0];
   if (!sub) return { status: 'NOT_FOUND' };
 
   const active = sub.subscribe_end && new Date(sub.subscribe_end) > new Date();
@@ -95,6 +105,11 @@ async function getMemberStatus(line_user_id) {
     nickname:    sub.nickname,
     expire_date: sub.subscribe_end,
     has_chart:   !!sub.chart_data,
+    // ข้อมูลเกิดเดิม สำหรับ prefill ฟอร์มแก้ไข
+    birth_date:       sub.birth_date,
+    birth_time:       sub.birth_time,
+    birth_time_known: sub.birth_time_known,
+    birth_place:      sub.birth_place,
   };
 }
 

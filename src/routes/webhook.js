@@ -127,6 +127,9 @@ async function handleEvent(event) {
             `🎂 เกิด: ${sub.birth_date || '-'} ${sub.birth_time || ''}`,
             `📍 ${sub.birth_place || '-'}`,
             `💳 สมาชิก: ${active ? 'ใช้งานอยู่ ถึง ' + new Date(sub.subscribe_end).toLocaleDateString('th-TH') : 'ยังไม่สมัคร/หมดอายุ'}`,
+            '',
+            `✏️ แก้ไขวันเกิด/เวลา/สถานที่ (กรอกผิดแก้ได้):`,
+            `👉 ${LIFF_URL}`,
           ].join('\n'),
         });
       }

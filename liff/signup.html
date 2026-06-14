@@ -108,6 +108,7 @@
   const LIFF_ID     = '2010382680-c6gh82Rm';  // LINE Login channel (classic LIFF)
 
   let profile = null;
+  let isActiveMember = false;   // เป็นสมาชิกที่ใช้งานอยู่ → โหมดแก้ไข (ไม่ต้องจ่ายซ้ำ)
 
   async function initLiff() {
     await liff.init({ liffId: LIFF_ID });
@@ -118,19 +119,40 @@
     }
     profile = await liff.getProfile();
 
-    // เช็กสถานะสมาชิก
+    // เติมชื่อเล่นจาก LINE เป็นค่าเริ่มต้น
+    document.getElementById('nickname').value = profile.displayName || '';
+
+    // เช็กสถานะสมาชิก + ดึงข้อมูลเกิดเดิมมา prefill (ให้แก้ไขได้ตลอด)
     try {
       const r = await fetch(`${BACKEND_URL}/api/line/member-status?line_user_id=${profile.userId}`);
       const s = await r.json();
-      if (s.status === 'ACTIVE') {
-        setSuccess('คุณเป็นสมาชิกอยู่แล้ว ✅', `ยินดีต้อนรับกลับ ${s.nickname || ''}!\nดวงส่งทุกเช้า 08:00 น.`);
-        return;
+      if (s.status && s.status !== 'NOT_FOUND') {
+        prefillForm(s);
+        isActiveMember = (s.status === 'ACTIVE');
+        // ปรับหัวข้อให้รู้ว่ากำลังแก้ไขข้อมูลเดิม
+        document.querySelector('.subtitle').textContent =
+          isActiveMember ? 'แก้ไขข้อมูลวันเกิดของคุณ' : 'ตรวจสอบ/แก้ไขข้อมูลแล้วสมัครต่อ';
+        if (isActiveMember) {
+          document.getElementById('btn-submit').textContent = 'บันทึกการแก้ไข →';
+        }
       }
     } catch (_) {}
 
-    // เติมชื่อเล่นจาก LINE ให้อัตโนมัติ
-    document.getElementById('nickname').value = profile.displayName || '';
     showStep('step-form');
+  }
+
+  // เติมข้อมูลเกิดเดิมลงฟอร์ม
+  function prefillForm(s) {
+    if (s.nickname)    document.getElementById('nickname').value   = s.nickname;
+    if (s.birth_date)  document.getElementById('birth_date').value = s.birth_date;
+    if (s.birth_place) document.getElementById('birth_place').value = s.birth_place;
+    // เวลาเกิด: ถ้าไม่ทราบเวลา → ติ๊ก checkbox + disable
+    if (s.birth_time_known === false || !s.birth_time) {
+      document.getElementById('time_unknown').checked = true;
+      toggleTime();
+    } else {
+      document.getElementById('birth_time').value = s.birth_time;
+    }
   }
 
   function toggleTime() {
@@ -168,11 +190,17 @@
       if (!r.ok) throw new Error(data.error || 'เกิดข้อผิดพลาด');
 
       renderChart(data.chart, nickname);
-      // โหมดเทสฟรี: เปิดใช้งานแล้ว ไม่ต้องจ่าย
-      if (data.free_access || data.sub_status === 'ACTIVE') {
-        const btn = document.getElementById('payBtn');
-        btn.textContent = '✅ เริ่มใช้งานเลย';
-        btn.onclick = () => { try { liff.closeWindow(); } catch (_) {} };
+      const payBtn = document.getElementById('payBtn');
+      if (isActiveMember) {
+        // สมาชิกเดิมแก้ข้อมูล — ดวงคำนวณใหม่แล้ว ไม่ต้องจ่ายซ้ำ
+        payBtn.textContent = '✅ บันทึกแล้ว — ปิดหน้านี้';
+        payBtn.onclick = () => { try { liff.closeWindow(); } catch (_) {} };
+        document.getElementById('chartbox').insertAdjacentHTML('beforeend',
+          '<div style="text-align:center;margin-top:14px;color:#9be89b;font-size:0.88rem">✅ อัปเดตข้อมูลวันเกิดเรียบร้อย<br/>ดวงถูกคำนวณใหม่แล้ว</div>');
+      } else if (data.free_access || data.sub_status === 'ACTIVE') {
+        // โหมดเทสฟรี: เปิดใช้งานแล้ว ไม่ต้องจ่าย
+        payBtn.textContent = '✅ เริ่มใช้งานเลย';
+        payBtn.onclick = () => { try { liff.closeWindow(); } catch (_) {} };
         document.getElementById('chartbox').insertAdjacentHTML('beforeend',
           '<div style="text-align:center;margin-top:14px;color:#9be89b;font-size:0.88rem">🎉 เปิดใช้งานฟรี (ช่วงทดสอบ)<br/>ปิดหน้านี้แล้วกดเมนูดูดวงได้เลย</div>');
       }
@@ -180,7 +208,8 @@
     } catch (err) {
       showError(err.message);
     } finally {
-      btn.disabled = false; btn.textContent = 'คำนวณดวงของฉัน →';
+      btn.disabled = false;
+      btn.textContent = isActiveMember ? 'บันทึกการแก้ไข →' : 'คำนวณดวงของฉัน →';
     }
   }
 
