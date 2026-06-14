@@ -78,11 +78,12 @@ async function handleEvent(event) {
   if (event.type === 'follow') {
     return replyMessage(event.replyToken, {
       type: 'text',
-      text: `ยินดีต้อนรับสู่ Prinnie333 ✨\nรับดวงส่วนตัวรายวันผ่าน LINE\n\nเริ่มต้นกรอกวันเกิด 👉 ${LIFF_URL}`,
+      text: `ยินดีต้อนรับสู่ Prinnie333 ✨\nรับดวงส่วนตัวรายวันผ่าน LINE\n\nเริ่มต้นกรอกวันเกิด 👉 ${LIFF_URL}\n\n💡 พิมพ์ "ช่วยเหลือ" เมื่อไรก็ได้ เพื่อดูวิธีใช้งาน`,
     });
   }
 
-  // ปุ่ม rich menu ส่ง postback / ข้อความพิมพ์ → เดาเจตนา (คีย์เวิร์ดดวงคู่)
+  // ปุ่ม rich menu ส่ง postback / ข้อความพิมพ์ → เดาเจตนา
+  //   คีย์เวิร์ดดวงคู่ → synastry, คีย์เวิร์ดช่วยเหลือ/ทักทาย → help, อื่น ๆ → help
   let action = null;
   if (event.type === 'postback') {
     action = new URLSearchParams(event.postback.data).get('action');
@@ -153,7 +154,7 @@ async function handleEvent(event) {
       default:
         return replyMessage(event.replyToken, {
           type: 'text',
-          text: `📖 วิธีใช้งาน Prinnie333\n\n• ดูดวงวันนี้ — ดวงรายวันส่วนตัว\n• พื้นดวง — ดวงกำเนิดของคุณ\n• ไพ่ทาโรต์ — ไพ่ประจำวัน\n• 💞 ผูกดวงคู่ — พิมพ์ "ดวงคู่" หรือกดชิป 💞 ใต้ข้อความดวง\n• สมัคร/ต่ออายุ/แก้ไขข้อมูล — ${LIFF_URL}\n\nดวงจะส่งอัตโนมัติทุกเช้า 08:00 น.`,
+          text: `📖 วิธีใช้งาน Prinnie333\n\n• ☀️ ดูดวงวันนี้ — ดวงรายวันส่วนตัว\n• 🌟 พื้นดวง — ดวงกำเนิดของคุณ\n• 🃏 ไพ่ทาโรต์ — ไพ่ประจำวัน\n• 💞 ผูกดวงคู่ — ดูดวงความเข้ากันกับคนพิเศษ\n• 💎 สมัคร/ต่ออายุ/แก้ไขข้อมูล — ${LIFF_URL}\n\nดวงจะส่งอัตโนมัติทุกเช้า 08:00 น.\n\n💜 มีคำถามเพิ่มเติม พิมพ์ทักแชทได้เลย ทีมงานยินดีช่วยดูแลค่ะ`,
         });
     }
   } catch (err) {

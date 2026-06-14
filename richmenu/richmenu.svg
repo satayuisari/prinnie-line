@@ -15,7 +15,6 @@
   </defs>
 
   <!-- พื้นหลัง AI ใส่โดย sharp ตอน composite — เลเยอร์นี้โปร่งใส -->
-  <!-- overlay มืดบางๆ ให้ไอคอน/ตัวอักษรเด่น (เนบิวลายังเห็น) -->
   <rect width="2500" height="1686" fill="#1a0533" opacity="0.25"/>
 
   <!-- เส้นแบ่ง 6 ช่อง (ตรง tap zone) -->
@@ -35,11 +34,13 @@
     <circle cx="2083.5" cy="1223" r="240" fill="url(#darkbehind)"/>
   </g>
 
-  <!-- ════ ICONS ════ -->
-  <!-- 1. ดูดวงวันนี้ : จันทร์เสี้ยว + ดาว -->
+  <!-- ════ ICONS แถวบน ════ -->
+  <!-- 1. ดูดวงวันนี้ : จันทร์เสี้ยว (วงกลมซ้อน evenodd) + ดาว -->
   <g transform="translate(416.5,330)">
-    <path d="M 28,-78 A 78,78 0 1 0 28,78 A 60,60 0 1 1 28,-78 Z" fill="url(#gold)"/>
-    <path d="M72,-46 l8,22 22,8 -22,8 -8,22 -8,-22 -22,-8 22,-8 z" fill="url(#gold)"/>
+    <path fill="url(#gold)" fill-rule="evenodd"
+          d="M -6 0 m -80 0 a 80 80 0 1 0 160 0 a 80 80 0 1 0 -160 0
+             M 36 0 m -66 0 a 66 66 0 1 0 132 0 a 66 66 0 1 0 -132 0"/>
+    <path d="M82,-44 l8,22 22,8 -22,8 -8,22 -8,-22 -22,-8 22,-8 z" fill="url(#gold)"/>
   </g>
   <!-- 2. พื้นดวงของฉัน : อาทิตย์ -->
   <g transform="translate(1250,330)">
@@ -60,25 +61,27 @@
     </g>
     <path d="M0,-34 l8,22 22,8 -22,8 -8,22 -8,-22 -22,-8 22,-8 z" fill="url(#gold)"/>
   </g>
-  <!-- 4. สมัคร / ต่ออายุ : เพชร -->
-  <g transform="translate(416.5,1173)">
+
+  <!-- ════ ICONS แถวล่าง ════ -->
+  <!-- 4. ผูกดวงคู่ : หัวใจคู่ -->
+  <g transform="translate(416.5,1200)">
+    <g fill="url(#gold)" stroke="#2d0a5a" stroke-width="6" stroke-linejoin="round">
+      <path transform="translate(-36,-12) scale(0.9)" d="M0,22 C-30,-28 -94,4 0,76 C94,4 30,-28 0,22 Z"/>
+      <path transform="translate(36,10) scale(0.9)"   d="M0,22 C-30,-28 -94,4 0,76 C94,4 30,-28 0,22 Z"/>
+    </g>
+  </g>
+  <!-- 5. สมัคร / ต่ออายุ : เพชร -->
+  <g transform="translate(1250,1173)">
     <path d="M-42,-72 L42,-72 L86,-26 L0,82 L-86,-26 Z" fill="url(#gold)"/>
     <g stroke="#2d0a5a" stroke-width="5" fill="none" stroke-linejoin="round">
       <line x1="-86" y1="-26" x2="86" y2="-26"/>
       <path d="M-42,-72 L-18,-26 L0,82 L18,-26 L42,-72"/>
     </g>
   </g>
-  <!-- 5. โปรไฟล์ของฉัน : คน -->
-  <g transform="translate(1250,1173)">
+  <!-- 6. โปรไฟล์ของฉัน : คน -->
+  <g transform="translate(2083.5,1173)">
     <circle cx="0" cy="-46" r="40" fill="url(#gold)"/>
     <path d="M-68,80 C-68,16 -36,4 0,4 C36,4 68,16 68,80 Z" fill="url(#gold)"/>
-  </g>
-  <!-- 6. วิธีใช้งาน : หนังสือ -->
-  <g transform="translate(2083.5,1173)">
-    <g fill="url(#gold)" stroke="#2d0a5a" stroke-width="5" stroke-linejoin="round">
-      <path d="M0,-52 C-32,-70 -76,-66 -92,-56 L-92,60 C-76,50 -32,54 0,72 Z"/>
-      <path d="M0,-52 C32,-70 76,-66 92,-56 L92,60 C76,50 32,54 0,72 Z"/>
-    </g>
   </g>
 
   <!-- ════ LABELS ════ (มี stroke เข้มกันกลืนพื้นหลัง) -->
@@ -87,9 +90,9 @@
     <text x="416.5"  y="545">ดูดวงวันนี้</text>
     <text x="1250"   y="545">พื้นดวงของฉัน</text>
     <text x="2083.5" y="545">ไพ่ทาโรต์</text>
-    <text x="416.5"  y="1388">สมัคร / ต่ออายุ</text>
-    <text x="1250"   y="1388">โปรไฟล์ของฉัน</text>
-    <text x="2083.5" y="1388">วิธีใช้งาน</text>
+    <text x="416.5"  y="1388">ผูกดวงคู่</text>
+    <text x="1250"   y="1388">สมัคร / ต่ออายุ</text>
+    <text x="2083.5" y="1388">โปรไฟล์ของฉัน</text>
   </g>
 
   <!-- แถบทอง บน-ล่าง -->

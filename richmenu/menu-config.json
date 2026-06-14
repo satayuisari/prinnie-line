@@ -1,7 +1,7 @@
 {
   "size": { "width": 2500, "height": 1686 },
   "selected": true,
-  "name": "Prinnie333 Main Menu",
+  "name": "Prinnie333 Main Menu v3 (6)",
   "chatBarText": "เมนูดูดวง ✨",
   "areas": [
     {
@@ -18,15 +18,15 @@
     },
     {
       "bounds": { "x": 0, "y": 843, "width": 833, "height": 843 },
-      "action": { "type": "uri", "uri": "https://liff.line.me/2010382680-c6gh82Rm" }
+      "action": { "type": "postback", "data": "action=synastry", "displayText": "ผูกดวงคู่" }
     },
     {
       "bounds": { "x": 833, "y": 843, "width": 834, "height": 843 },
-      "action": { "type": "postback", "data": "action=profile", "displayText": "โปรไฟล์ของฉัน" }
+      "action": { "type": "uri", "uri": "https://liff.line.me/2010382680-c6gh82Rm" }
     },
     {
       "bounds": { "x": 1667, "y": 843, "width": 833, "height": 843 },
-      "action": { "type": "postback", "data": "action=help", "displayText": "วิธีใช้งาน" }
+      "action": { "type": "postback", "data": "action=profile", "displayText": "โปรไฟล์ของฉัน" }
     }
   ]
 }
