@@ -2,6 +2,9 @@ const express     = require('express');
 const router      = express.Router();
 const subscribers = require('../services/subscriberService');
 const horoscope   = require('../services/horoscopeService');
+const synastry    = require('../services/synastryService');
+const geocoding   = require('../services/geocodingService');
+const { computeNatalChart } = require('../astro/natalChart');
 
 // POST /api/line/signup
 // รับข้อมูลเกิดจาก LIFF → คำนวณดวง → เก็บ
@@ -63,6 +66,47 @@ router.get('/daily-horoscope', async (req, res) => {
     const targetDate = date ? new Date(date) : new Date();
     res.json(await horoscope.dailyReading(sub.chart_data, targetDate));
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/line/synastry — ผูกดวงคู่
+// รับวันเกิดของอีกฝ่าย → คำนวณดวงคู่ → เทียบกับดวงของผู้ใช้
+router.post('/synastry', async (req, res) => {
+  const {
+    line_user_id, partner_name,
+    birth_date, birth_time, birth_place, lat, lng,
+  } = req.body;
+
+  if (!line_user_id || !birth_date) {
+    return res.status(400).json({ error: 'ต้องส่ง line_user_id และวันเกิดของคู่' });
+  }
+
+  try {
+    const me = await subscribers.getByLineUserId(line_user_id);
+    if (!me || !me.chart_data) {
+      return res.status(404).json({ error: 'คุณยังไม่มีข้อมูลดวง กรุณาลงทะเบียนดวงของคุณก่อน' });
+    }
+
+    // พิกัด/timezone ของคู่ (geocode ถ้าไม่ได้ส่ง lat/lng มา)
+    let plat = lat != null ? Number(lat) : null;
+    let plng = lng != null ? Number(lng) : null;
+    if ((plat == null || plng == null) && birth_place) {
+      const g = await geocoding.geocode(birth_place);
+      plat = g.lat; plng = g.lng;
+    }
+
+    const partnerChart = computeNatalChart({ date: birth_date, time: birth_time || null, lat: plat, lng: plng });
+    const reading = await synastry.synastryReading(me.chart_data, partnerChart);
+
+    res.json({
+      partner_name: partner_name || 'คู่ของคุณ',
+      me:      { sun: me.chart_data.sun, moon: me.chart_data.moon, rising: me.chart_data.rising },
+      partner: { sun: partnerChart.sun, moon: partnerChart.moon, rising: partnerChart.rising },
+      reading,
+    });
+  } catch (err) {
+    console.error('[synastry]', err.message);
     res.status(500).json({ error: err.message });
   }
 });

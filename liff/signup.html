@@ -86,6 +86,7 @@
     <div class="hint">ใช้คำนวณลัคนาและ timezone — พิมพ์ชื่อจังหวัดหรือเมืองได้เลย</div>
 
     <button class="btn" id="btn-submit" onclick="submitForm()">คำนวณดวงของฉัน →</button>
+    <button class="btn btn-ghost" id="btn-goto-couple" style="display:none" onclick="showStep('step-couple-form')">💞 ดูดวงคู่กับคนพิเศษ</button>
   </div>
 
   <!-- Step 2: ผลดวง + สมัคร -->
@@ -100,6 +101,39 @@
     <div class="success-icon">✨</div>
     <div class="success-title" id="success-title">ลงทะเบียนสำเร็จ!</div>
     <div class="success-body" id="success-body">ดวงส่วนตัวจะถูกส่งทุกเช้า 08:00 น.<br/>ปิดหน้าต่างนี้ได้เลย</div>
+  </div>
+
+  <!-- Step 4: ฟอร์มผูกดวงคู่ -->
+  <div class="step" id="step-couple-form">
+    <div style="text-align:center;font-size:1.1rem;font-weight:700;color:#e8c4f7;margin-bottom:4px;">💞 ผูกดวงคู่</div>
+    <div class="hint" style="text-align:center;margin:0 0 18px;">กรอกวันเกิดของคนพิเศษ เพื่อดูความเข้ากันกับดวงของคุณ</div>
+    <div class="error" id="couple-error"></div>
+
+    <label>ชื่อเล่นของคู่</label>
+    <input type="text" id="c_nickname" placeholder="เช่น มายด์" maxlength="50" />
+
+    <label>วันเกิดของคู่</label>
+    <input type="date" id="c_birth_date" />
+
+    <label>เวลาเกิดของคู่</label>
+    <input type="time" id="c_birth_time" />
+    <div class="checkrow">
+      <input type="checkbox" id="c_time_unknown" onchange="toggleCoupleTime()" />
+      <label for="c_time_unknown">ไม่ทราบเวลาเกิดของคู่</label>
+    </div>
+
+    <label>สถานที่เกิดของคู่ (จังหวัด/เมือง)</label>
+    <input type="text" id="c_birth_place" placeholder="เช่น กรุงเทพมหานคร" />
+
+    <button class="btn" id="btn-couple-submit" onclick="submitCouple()">ดูดวงคู่ของเรา 💞</button>
+    <button class="btn btn-ghost" onclick="showStep('step-form')">← กลับ</button>
+  </div>
+
+  <!-- Step 5: ผลดวงคู่ -->
+  <div class="step" id="step-couple-result">
+    <div class="chartbox" id="couplebox"></div>
+    <button class="btn btn-ghost" onclick="showStep('step-couple-form')">↺ ลองคู่อื่น</button>
+    <button class="btn btn-ghost" onclick="closeLiff()">ปิดหน้านี้</button>
   </div>
 </div>
 
@@ -123,11 +157,13 @@
     document.getElementById('nickname').value = profile.displayName || '';
 
     // เช็กสถานะสมาชิก + ดึงข้อมูลเกิดเดิมมา prefill (ให้แก้ไขได้ตลอด)
+    let hasChart = false;
     try {
       const r = await fetch(`${BACKEND_URL}/api/line/member-status?line_user_id=${profile.userId}`);
       const s = await r.json();
       if (s.status && s.status !== 'NOT_FOUND') {
         prefillForm(s);
+        hasChart = !!s.has_chart;
         isActiveMember = (s.status === 'ACTIVE');
         // ปรับหัวข้อให้รู้ว่ากำลังแก้ไขข้อมูลเดิม
         document.querySelector('.subtitle').textContent =
@@ -138,8 +174,33 @@
       }
     } catch (_) {}
 
+    // มีดวงแล้ว → โชว์ปุ่มเข้าผูกดวงคู่
+    if (hasChart) document.getElementById('btn-goto-couple').style.display = '';
+
+    // เปิดมาจากชิป/ปุ่ม "ดูดวงคู่" (?view=couple) → ไปฟอร์มคู่ทันที (ถ้ามีดวงแล้ว)
+    if (getView() === 'couple') {
+      if (hasChart) { showStep('step-couple-form'); return; }
+      showError('กรุณาลงทะเบียนดวงของคุณก่อน แล้วจึงผูกดวงคู่ได้');
+    }
+
     showStep('step-form');
   }
+
+  // อ่านพารามิเตอร์ view จาก URL (รองรับทั้ง location.search และ liff.state)
+  function getView() {
+    try {
+      const direct = new URLSearchParams(location.search).get('view');
+      if (direct) return direct;
+      const stateRaw = new URLSearchParams(location.search).get('liff.state');
+      if (stateRaw) {
+        const q = decodeURIComponent(stateRaw).split('?')[1] || '';
+        return new URLSearchParams(q).get('view');
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  function closeLiff() { try { liff.closeWindow(); } catch (_) {} }
 
   // เติมข้อมูลเกิดเดิมลงฟอร์ม
   function prefillForm(s) {
@@ -227,6 +288,67 @@
   const TH = { Aries:'เมษ',Taurus:'พฤษภ',Gemini:'เมถุน',Cancer:'กรกฎ',Leo:'สิงห์',Virgo:'กันย์',
                Libra:'ตุลย์',Scorpio:'พิจิก',Sagittarius:'ธนู',Capricorn:'มังกร',Aquarius:'กุมภ์',Pisces:'มีน' };
   function signTH(s) { return s ? (TH[s] || s) : '-'; }
+
+  // ───────── ผูกดวงคู่ ─────────
+  function toggleCoupleTime() {
+    const unknown = document.getElementById('c_time_unknown').checked;
+    const t = document.getElementById('c_birth_time');
+    t.disabled = unknown;
+    if (unknown) t.value = '';
+  }
+
+  async function submitCouple() {
+    const name    = document.getElementById('c_nickname').value.trim();
+    const bd      = document.getElementById('c_birth_date').value;
+    const unknown = document.getElementById('c_time_unknown').checked;
+    const bt      = unknown ? null : document.getElementById('c_birth_time').value;
+    const bp      = document.getElementById('c_birth_place').value.trim();
+
+    const errEl = document.getElementById('couple-error'); errEl.style.display = 'none';
+    if (!bd) { errEl.textContent = 'กรุณาเลือกวันเกิดของคู่'; errEl.style.display = 'block'; return; }
+    if (!bp) { errEl.textContent = 'กรุณากรอกสถานที่เกิดของคู่'; errEl.style.display = 'block'; return; }
+    if (!unknown && !bt) { errEl.textContent = 'กรุณากรอกเวลาเกิด หรือเลือก "ไม่ทราบเวลา"'; errEl.style.display = 'block'; return; }
+
+    const btn = document.getElementById('btn-couple-submit');
+    btn.disabled = true; btn.textContent = 'กำลังผูกดวง...';
+    try {
+      const r = await fetch(`${BACKEND_URL}/api/line/synastry`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          line_user_id: profile.userId,
+          partner_name: name, birth_date: bd, birth_time: bt, birth_place: bp,
+        }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'เกิดข้อผิดพลาด');
+      renderCouple(data);
+      showStep('step-couple-result');
+    } catch (err) {
+      errEl.textContent = err.message; errEl.style.display = 'block';
+    } finally {
+      btn.disabled = false; btn.textContent = 'ดูดวงคู่ของเรา 💞';
+    }
+  }
+
+  function renderCouple(d) {
+    const pname = d.partner_name || 'คู่ของคุณ';
+    const rows = `
+      <div class="chartrow"><span>☀️ อาทิตย์</span><span class="v">${signTH(d.me.sun)} · ${signTH(d.partner.sun)}</span></div>
+      <div class="chartrow"><span>🌙 จันทร์</span><span class="v">${signTH(d.me.moon)} · ${signTH(d.partner.moon)}</span></div>
+      <div class="chartrow"><span>⬆️ ลัคนา</span><span class="v">${d.me.rising ? signTH(d.me.rising) : '-'} · ${d.partner.rising ? signTH(d.partner.rising) : '-'}</span></div>`;
+    let body;
+    if (d.reading && d.reading.has_content) {
+      body = d.reading.aspects.map(a =>
+        `<div style="padding:10px 0;border-top:1px solid rgba(255,255,255,0.1);font-size:0.92rem;line-height:1.6;color:rgba(255,255,255,0.9);">💫 ${a.text}</div>`
+      ).join('');
+    } else {
+      body = '<div style="padding:14px 0;text-align:center;color:rgba(255,255,255,0.7);font-size:0.9rem;">ดวงของคุณสองคนค่อนข้างเป็นกลาง ✨<br/>ไม่มีมุมเด่นพิเศษระหว่างกัน</div>';
+    }
+    document.getElementById('couplebox').innerHTML = `
+      <div style="text-align:center;font-weight:700;color:#e8c4f7;margin-bottom:12px;">💞 ดวงคู่: คุณ × ${pname}</div>
+      <div style="text-align:center;font-size:0.72rem;color:rgba(255,255,255,0.45);margin-bottom:8px;">(คุณ · ${pname})</div>
+      ${rows}${body}`;
+  }
 
   async function goToPayment() {
     const btn = document.getElementById('payBtn');

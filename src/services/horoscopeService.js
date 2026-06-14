@@ -102,11 +102,38 @@ async function tarotByType(type) {
   return { name: r.rows[0].name || 'ไพ่ประจำช่วง', text: stripHtml(r.rows[0].description), image };
 }
 
+// ลายเซ็นของชุดมุม (ใช้เทียบว่าดวงวันนี้เหมือนวันก่อนไหม)
+// เรียงก่อน join → ชุดมุมเดิมที่สลับลำดับ (ดาวขยับเล็กน้อย) ก็ถือว่าซ้ำ
+function aspectSig(aspects) {
+  return aspects
+    .map(a => `${a.aspecting_planet}-${a.aspect}-${a.aspected_planet}`)
+    .sort()
+    .join('|');
+}
+
 // ===== ดวงรายวัน = ดาวเร็วทำมุมวันนี้ + ไพ่ =====
 async function dailyReading(chart, date = new Date()) {
   const aspects = await transitReading(chart, date, FAST, 3);
   const tarot   = await tarotByType('free');
-  return { date: date.toISOString().slice(0, 10), aspects, tarot, has_content: aspects.length > 0 };
+
+  // กันดวงซ้ำ: ดาวเร็วบางดวง (ศุกร์/อังคาร/อาทิตย์) เคลื่อนช้า มุมค้างได้หลายวัน
+  // ถ้าชุดมุมวันนี้เหมือนเมื่อวานเป๊ะ → ถือว่า "ดวงนิ่ง" ไม่ส่งคำทำนายซ้ำ ส่งไพ่อย่างเดียว
+  let calm = aspects.length === 0;
+  if (!calm) {
+    const prevDate = new Date(date);
+    prevDate.setDate(prevDate.getDate() - 1);
+    const prev = await transitReading(chart, prevDate, FAST, 3);
+    if (aspectSig(prev) === aspectSig(aspects)) calm = true;
+  }
+
+  const shown = calm ? [] : aspects;
+  return {
+    date: date.toISOString().slice(0, 10),
+    aspects: shown,
+    tarot,
+    calm,
+    has_content: shown.length > 0,
+  };
 }
 
 // ===== รายสัปดาห์/เดือน/ปี = ดาวจร (ตามชุดความเร็ว) + ไพ่ประจำช่วง =====

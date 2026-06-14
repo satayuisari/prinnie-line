@@ -6,6 +6,8 @@ const { replyMessage, isAllowed, TEST_MODE } = require('../services/lineMessagin
 const LIFF_URL = process.env.LINE_LIFF_ID
   ? `https://liff.line.me/${process.env.LINE_LIFF_ID}`
   : 'https://liff.line.me/YOUR_LIFF_ID';
+// เปิด LIFF ไปที่ฟอร์มผูกดวงคู่ (signup.html อ่าน ?view=couple)
+const COUPLE_LIFF = `${LIFF_URL}?view=couple`;
 
 const SIGNUP_PROMPT = {
   type: 'text',
@@ -19,6 +21,7 @@ const PERIOD_QR = {
     { type: 'action', action: { type: 'postback', label: '📅 รายสัปดาห์', data: 'action=weekly',  displayText: 'ดูดวงรายสัปดาห์' } },
     { type: 'action', action: { type: 'postback', label: '🗓️ รายเดือน',  data: 'action=monthly', displayText: 'ดูดวงรายเดือน' } },
     { type: 'action', action: { type: 'postback', label: '✨ รายปี',      data: 'action=annual',  displayText: 'ดูดวงรายปี' } },
+    { type: 'action', action: { type: 'uri',      label: '💞 ดูดวงคู่',   uri: COUPLE_LIFF } },
   ],
 };
 function textQR(text) {
@@ -31,7 +34,8 @@ function formatReading(reading, title, nickname) {
     lines.push('🌟 ดาวจร');
     reading.aspects.forEach(a => lines.push(a.text, ''));
   } else {
-    lines.push('🌟 ช่วงนี้ดวงดาวค่อนข้างสงบ ไม่มีมุมเด่น', '');
+    lines.push('🌙 ช่วงนี้ดวงดาวของคุณนิ่งสงบ ไม่มีมุมเด่นพิเศษ',
+               'เป็นวันสบาย ๆ ขอให้ไพ่ใบนี้นำทางคุณนะคะ ✨', '');
   }
   if (reading.tarot) lines.push('🃏 ' + reading.tarot.name, reading.tarot.text);
   return lines.join('\n').trim();
@@ -78,10 +82,14 @@ async function handleEvent(event) {
     });
   }
 
-  // ปุ่ม rich menu ส่ง postback
-  const action = event.type === 'postback'
-    ? new URLSearchParams(event.postback.data).get('action')
-    : (event.type === 'message' && event.message.type === 'text' ? 'help' : null);
+  // ปุ่ม rich menu ส่ง postback / ข้อความพิมพ์ → เดาเจตนา (คีย์เวิร์ดดวงคู่)
+  let action = null;
+  if (event.type === 'postback') {
+    action = new URLSearchParams(event.postback.data).get('action');
+  } else if (event.type === 'message' && event.message.type === 'text') {
+    const t = (event.message.text || '').trim();
+    action = /คู่|ผูกดวง|ความรัก|แฟน/.test(t) ? 'synastry' : 'help';
+  }
 
   if (!action) return;
 
@@ -133,11 +141,19 @@ async function handleEvent(event) {
           ].join('\n'),
         });
       }
+      case 'synastry': {
+        // ผูกดวงคู่ — ต้องมีดวงของตัวเองก่อน แล้วเปิด LIFF กรอกวันเกิดของอีกฝ่าย
+        if (!sub || !sub.chart_data) return replyMessage(event.replyToken, SIGNUP_PROMPT);
+        return replyMessage(event.replyToken, {
+          type: 'text',
+          text: `💞 ผูกดวงคู่ — ดูความเข้ากันของคุณกับคนพิเศษ\n\nกรอกวันเกิดของอีกฝ่าย แล้วดูดวงความสัมพันธ์ได้เลย\n\n👉 ${COUPLE_LIFF}`,
+        });
+      }
       case 'help':
       default:
         return replyMessage(event.replyToken, {
           type: 'text',
-          text: `📖 วิธีใช้งาน Prinnie333\n\n• ดูดวงวันนี้ — ดวงรายวันส่วนตัว\n• พื้นดวง — ดวงกำเนิดของคุณ\n• ไพ่ทาโรต์ — ไพ่ประจำวัน\n• สมัคร/ต่ออายุ — ${LIFF_URL}\n\nดวงจะส่งอัตโนมัติทุกเช้า 08:00 น.`,
+          text: `📖 วิธีใช้งาน Prinnie333\n\n• ดูดวงวันนี้ — ดวงรายวันส่วนตัว\n• พื้นดวง — ดวงกำเนิดของคุณ\n• ไพ่ทาโรต์ — ไพ่ประจำวัน\n• 💞 ผูกดวงคู่ — พิมพ์ "ดวงคู่" หรือกดชิป 💞 ใต้ข้อความดวง\n• สมัคร/ต่ออายุ/แก้ไขข้อมูล — ${LIFF_URL}\n\nดวงจะส่งอัตโนมัติทุกเช้า 08:00 น.`,
         });
     }
   } catch (err) {
