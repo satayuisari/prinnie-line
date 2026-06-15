@@ -107,8 +107,9 @@ async function handleEvent(event) {
 
   // ════ PAYWALL: ฟีเจอร์พรีเมียมต้องเป็นสมาชิกที่ยัง active ════
   // ฟรี: natal (พื้นดวง=hook), tarot (ไพ่รายวัน teaser), profile, help
-  // จ่าย: daily, weekly, monthly, annual, synastry
-  const PAID   = new Set(['daily', 'weekly', 'monthly', 'annual', 'synastry']);
+  // จ่าย: daily, weekly, monthly, annual
+  // synastry ไม่อยู่ใน gate นี้ — คนนอกเข้าถึง teaser ได้ แล้วจ่าย 149 ปลดล็อก (คุมใน /synastry route)
+  const PAID   = new Set(['daily', 'weekly', 'monthly', 'annual']);
   const active = !!(sub && sub.subscribe_end && new Date(sub.subscribe_end) > new Date());
   if (PAID.has(action)) {
     if (!sub || !sub.chart_data) return replyMessage(event.replyToken, SIGNUP_PROMPT);

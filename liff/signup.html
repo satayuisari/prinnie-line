@@ -143,6 +143,7 @@
 
   let profile = null;
   let isActiveMember = false;   // เป็นสมาชิกที่ใช้งานอยู่ → โหมดแก้ไข (ไม่ต้องจ่ายซ้ำ)
+  let lastCoupleInput = null;   // ข้อมูลคู่ล่าสุด (ใช้ตอนกดปลดล็อก 149)
 
   async function initLiff() {
     await liff.init({ liffId: LIFF_ID });
@@ -310,12 +311,13 @@
     if (!bp) { errEl.textContent = 'กรุณากรอกสถานที่เกิดของคู่'; errEl.style.display = 'block'; return; }
     if (!unknown && !bt) { errEl.textContent = 'กรุณากรอกเวลาเกิด หรือเลือก "ไม่ทราบเวลา"'; errEl.style.display = 'block'; return; }
 
+    lastCoupleInput = { partner_name: name, birth_date: bd, birth_time: bt, birth_place: bp };
     const btn = document.getElementById('btn-couple-submit');
     btn.disabled = true; btn.textContent = 'กำลังผูกดวง...';
     try {
       const r = await fetch(`${BACKEND_URL}/api/line/synastry`, {
         method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ partner_name: name, birth_date: bd, birth_time: bt, birth_place: bp }),
+        body: JSON.stringify(lastCoupleInput),
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || 'เกิดข้อผิดพลาด');
@@ -330,22 +332,50 @@
 
   function renderCouple(d) {
     const pname = d.partner_name || 'คู่ของคุณ';
+    const head = `
+      <div style="text-align:center;font-weight:700;color:#e8c4f7;margin-bottom:6px;">💞 คุณ × ${pname}</div>
+      <div style="text-align:center;margin-bottom:10px;">
+        <span style="font-size:2.6rem;font-weight:800;color:#fff;text-shadow:0 0 18px rgba(199,125,255,0.7);">${d.score}%</span>
+        <div style="font-size:0.74rem;color:rgba(255,255,255,0.5);">ความเข้ากันของดวงคุณสองคน</div>
+      </div>`;
     const rows = `
+      <div style="text-align:center;font-size:0.7rem;color:rgba(255,255,255,0.4);margin-bottom:4px;">(คุณ · ${pname})</div>
       <div class="chartrow"><span>☀️ อาทิตย์</span><span class="v">${signTH(d.me.sun)} · ${signTH(d.partner.sun)}</span></div>
       <div class="chartrow"><span>🌙 จันทร์</span><span class="v">${signTH(d.me.moon)} · ${signTH(d.partner.moon)}</span></div>
       <div class="chartrow"><span>⬆️ ลัคนา</span><span class="v">${d.me.rising ? signTH(d.me.rising) : '-'} · ${d.partner.rising ? signTH(d.partner.rising) : '-'}</span></div>`;
+
     let body;
-    if (d.reading && d.reading.has_content) {
+    if (d.locked) {
+      // teaser — โชว์มุมดี 1 บรรทัด แล้วล็อกที่เหลือ + ปุ่มจ่าย 149 + upsell
+      const tease = d.teaser ? d.teaser.text : 'ดวงของคุณสองคนมีหลายแง่มุมน่าสนใจ';
+      body = `
+        <div style="padding:12px 0;border-top:1px solid rgba(255,255,255,0.1);font-size:0.92rem;line-height:1.6;color:rgba(255,255,255,0.9);">✨ ${tease.slice(0,90)}...</div>
+        <div style="text-align:center;color:rgba(255,255,255,0.55);font-size:0.85rem;padding:8px 0 14px;">🔒 อ่านเต็ม — จุดแข็ง จุดต้องระวัง ความรัก เรื่องเงิน</div>
+        <button class="btn" onclick="goToCoupleCheckout()">ปลดล็อกอ่านเต็ม ${d.price || 149} บาท →</button>
+        <div style="text-align:center;font-size:0.78rem;color:rgba(255,255,255,0.5);margin-top:10px;">หรือเป็นสมาชิก 399/เดือน → ดูดวงคู่ไม่จำกัด + ดวงรายวันส่วนตัว</div>`;
+    } else if (d.reading && d.reading.has_content) {
       body = d.reading.aspects.map(a =>
         `<div style="padding:10px 0;border-top:1px solid rgba(255,255,255,0.1);font-size:0.92rem;line-height:1.6;color:rgba(255,255,255,0.9);">💫 ${a.text}</div>`
       ).join('');
     } else {
       body = '<div style="padding:14px 0;text-align:center;color:rgba(255,255,255,0.7);font-size:0.9rem;">ดวงของคุณสองคนค่อนข้างเป็นกลาง ✨<br/>ไม่มีมุมเด่นพิเศษระหว่างกัน</div>';
     }
-    document.getElementById('couplebox').innerHTML = `
-      <div style="text-align:center;font-weight:700;color:#e8c4f7;margin-bottom:12px;">💞 ดวงคู่: คุณ × ${pname}</div>
-      <div style="text-align:center;font-size:0.72rem;color:rgba(255,255,255,0.45);margin-bottom:8px;">(คุณ · ${pname})</div>
-      ${rows}${body}`;
+    document.getElementById('couplebox').innerHTML = head + rows + body;
+  }
+
+  async function goToCoupleCheckout() {
+    if (!lastCoupleInput) return;
+    try {
+      const r = await fetch(`${BACKEND_URL}/api/line/couple-checkout`, {
+        method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(lastCoupleInput),
+      });
+      const d = await r.json();
+      if (!r.ok || !d.url) throw new Error(d.error || 'สร้างหน้าจ่ายเงินไม่สำเร็จ');
+      liff.openWindow({ url: d.url, external: true });
+    } catch (err) {
+      alert(err.message);
+    }
   }
 
   async function goToPayment() {
