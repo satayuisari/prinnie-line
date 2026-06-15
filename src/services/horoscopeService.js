@@ -55,13 +55,15 @@ async function westernText(planet, sign) {
 }
 
 // ===== ดาวจร (transit) =====
-// แยกดาวตามความเร็ว → ใช้กำหนดช่วงเวลา
-//   ดาวเร็ว (จันทร์/อาทิตย์/พุธ/ศุกร์/อังคาร) เปลี่ยนมุมรายวัน → ดวงรายวัน
-//   ดาวกลาง (อาทิตย์..พฤหัส) → รายเดือน
-//   ดาวช้า (พฤหัส/เสาร์/ยูเรนัส/เนปจูน/พลูโต) อิทธิพลยาว → รายปี
-const FAST   = ['Moon', 'Sun', 'Mercury', 'Venus', 'Mars'];
-const MEDIUM = ['Sun', 'Mercury', 'Venus', 'Mars', 'Jupiter'];
-const SLOW   = ['Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto'];
+// แบ่งดาวตามความเร็ว → แต่ละช่วงใช้ "คนละชุด ไม่ทับกัน" (กันดวงแต่ละช่วงซ้ำกัน)
+//   รายวัน  = อาทิตย์/จันทร์ (จันทร์เปลี่ยนทุกวัน)
+//   รายสัปดาห์ = พุธ/ศุกร์
+//   รายเดือน = อังคาร/พฤหัส
+//   รายปี   = เสาร์/เนปจูน/พลูโต (ดาวนอก อิทธิพลยาวเป็นปี)
+const DAILY_PLANETS   = ['Sun', 'Moon'];
+const WEEKLY_PLANETS  = ['Mercury', 'Venus'];
+const MONTHLY_PLANETS = ['Mars', 'Jupiter'];
+const YEARLY_PLANETS  = ['Saturn', 'Neptune', 'Pluto'];
 
 // คำนวณมุมดาวจร→ดาวกำเนิด เฉพาะดาวใน planetFilter แล้วดึงคำทำนายที่มีเนื้อหา
 async function transitReading(chart, date, planetFilter, limit = 3) {
@@ -113,16 +115,16 @@ function aspectSig(aspects) {
 
 // ===== ดวงรายวัน = ดาวเร็วทำมุมวันนี้ + ไพ่ =====
 async function dailyReading(chart, date = new Date()) {
-  const aspects = await transitReading(chart, date, FAST, 3);
+  const aspects = await transitReading(chart, date, DAILY_PLANETS, 3);
   const tarot   = await tarotByType('free');
 
-  // กันดวงซ้ำ: ดาวเร็วบางดวง (ศุกร์/อังคาร/อาทิตย์) เคลื่อนช้า มุมค้างได้หลายวัน
+  // กันดวงซ้ำ: อาทิตย์เคลื่อนช้า (~1°/วัน) มุมค้างได้หลายวัน
   // ถ้าชุดมุมวันนี้เหมือนเมื่อวานเป๊ะ → ถือว่า "ดวงนิ่ง" ไม่ส่งคำทำนายซ้ำ ส่งไพ่อย่างเดียว
   let calm = aspects.length === 0;
   if (!calm) {
     const prevDate = new Date(date);
     prevDate.setDate(prevDate.getDate() - 1);
-    const prev = await transitReading(chart, prevDate, FAST, 3);
+    const prev = await transitReading(chart, prevDate, DAILY_PLANETS, 3);
     if (aspectSig(prev) === aspectSig(aspects)) calm = true;
   }
 
@@ -138,9 +140,9 @@ async function dailyReading(chart, date = new Date()) {
 
 // ===== รายสัปดาห์/เดือน/ปี = ดาวจร (ตามชุดความเร็ว) + ไพ่ประจำช่วง =====
 const PERIOD_CFG = {
-  weekly:  { planets: FAST,   tarot: 'weekly'  },
-  monthly: { planets: MEDIUM, tarot: 'monthly' },
-  annual:  { planets: SLOW,   tarot: 'annual'  },
+  weekly:  { planets: WEEKLY_PLANETS,  tarot: 'weekly'  },
+  monthly: { planets: MONTHLY_PLANETS, tarot: 'monthly' },
+  annual:  { planets: YEARLY_PLANETS,  tarot: 'annual'  },
 };
 async function periodReading(period, chart, date = new Date()) {
   const cfg     = PERIOD_CFG[period] || PERIOD_CFG.monthly;
