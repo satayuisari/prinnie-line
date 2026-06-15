@@ -14,6 +14,11 @@ const SIGNUP_PROMPT = {
   text: `ยังไม่มีข้อมูลดวงของคุณ 🌙\nกรุณากรอกวันเกิดก่อน เพื่อรับดวงส่วนตัว\n\n👉 ${LIFF_URL}`,
 };
 
+const PAYWALL_PROMPT = {
+  type: 'text',
+  text: `ฟีเจอร์นี้สำหรับสมาชิก Prinnie333 ✨\n\nสมัคร/ต่ออายุ เพียง 399 บาท/เดือน\nรับดวงส่วนตัวทุกเช้า + ผูกดวงคู่ + ดวงรายสัปดาห์/เดือน/ปี\n\n👉 ${LIFF_URL}`,
+};
+
 // ปุ่ม quick reply เลือกช่วงเวลา (ติดท้ายข้อความดวง)
 const PERIOD_QR = {
   items: [
@@ -83,19 +88,32 @@ async function handleEvent(event) {
   }
 
   // ปุ่ม rich menu ส่ง postback / ข้อความพิมพ์ → เดาเจตนา
-  //   คีย์เวิร์ดดวงคู่ → synastry, คีย์เวิร์ดช่วยเหลือ/ทักทาย → help, อื่น ๆ → help
+  //   คีย์เวิร์ดดวงคู่ → synastry, คีย์เวิร์ดช่วยเหลือ/ทักทาย → help
+  //   ข้อความอื่น → เงียบ (return) ให้พนักงานตอบแชทเอง ไม่ให้บอทแย่งตอบ
   let action = null;
   if (event.type === 'postback') {
     action = new URLSearchParams(event.postback.data).get('action');
   } else if (event.type === 'message' && event.message.type === 'text') {
     const t = (event.message.text || '').trim();
-    action = /คู่|ผูกดวง|ความรัก|แฟน/.test(t) ? 'synastry' : 'help';
+    if (/คู่|ผูกดวง|ความรัก|แฟน/.test(t)) action = 'synastry';
+    else if (/ช่วยเหลือ|วิธีใช้|เมนู|help|สวัสดี|hello|hi|^\?+$/i.test(t)) action = 'help';
+    else action = null;
   }
 
   if (!action) return;
 
   const userId = event.source.userId;
   const sub    = await subscribers.getByLineUserId(userId);
+
+  // ════ PAYWALL: ฟีเจอร์พรีเมียมต้องเป็นสมาชิกที่ยัง active ════
+  // ฟรี: natal (พื้นดวง=hook), tarot (ไพ่รายวัน teaser), profile, help
+  // จ่าย: daily, weekly, monthly, annual, synastry
+  const PAID   = new Set(['daily', 'weekly', 'monthly', 'annual', 'synastry']);
+  const active = !!(sub && sub.subscribe_end && new Date(sub.subscribe_end) > new Date());
+  if (PAID.has(action)) {
+    if (!sub || !sub.chart_data) return replyMessage(event.replyToken, SIGNUP_PROMPT);
+    if (!active) return replyMessage(event.replyToken, PAYWALL_PROMPT);
+  }
 
   try {
     switch (action) {

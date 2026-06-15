@@ -159,7 +159,7 @@
     // เช็กสถานะสมาชิก + ดึงข้อมูลเกิดเดิมมา prefill (ให้แก้ไขได้ตลอด)
     let hasChart = false;
     try {
-      const r = await fetch(`${BACKEND_URL}/api/line/member-status?line_user_id=${profile.userId}`);
+      const r = await fetch(`${BACKEND_URL}/api/line/member-status`, { headers: authHeaders() });
       const s = await r.json();
       if (s.status && s.status !== 'NOT_FOUND') {
         prefillForm(s);
@@ -202,6 +202,12 @@
 
   function closeLiff() { try { liff.closeWindow(); } catch (_) {} }
 
+  // แนบ LINE access token ให้ backend verify ตัวตน (กันคนอื่นเข้าถึงข้อมูลเรา)
+  function authHeaders(extra) {
+    const t = (typeof liff !== 'undefined' && liff.getAccessToken) ? liff.getAccessToken() : null;
+    return Object.assign({ 'Authorization': 'Bearer ' + t }, extra || {});
+  }
+
   // เติมข้อมูลเกิดเดิมลงฟอร์ม
   function prefillForm(s) {
     if (s.nickname)    document.getElementById('nickname').value   = s.nickname;
@@ -239,13 +245,8 @@
 
     try {
       const r = await fetch(`${BACKEND_URL}/api/line/signup`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          line_user_id: profile.userId,
-          display_name: profile.displayName,
-          picture_url:  profile.pictureUrl,
-          nickname, birth_date, birth_time, birth_place,
-        }),
+        method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ nickname, birth_date, birth_time, birth_place }),
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || 'เกิดข้อผิดพลาด');
@@ -313,11 +314,8 @@
     btn.disabled = true; btn.textContent = 'กำลังผูกดวง...';
     try {
       const r = await fetch(`${BACKEND_URL}/api/line/synastry`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          line_user_id: profile.userId,
-          partner_name: name, birth_date: bd, birth_time: bt, birth_place: bp,
-        }),
+        method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ partner_name: name, birth_date: bd, birth_time: bt, birth_place: bp }),
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || 'เกิดข้อผิดพลาด');
@@ -355,8 +353,8 @@
     btn.disabled = true; btn.textContent = 'กำลังเปิดหน้าจ่ายเงิน...';
     try {
       const r = await fetch(`${BACKEND_URL}/api/payment/create-checkout`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ line_user_id: profile.userId }),
+        method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({}),
       });
       const d = await r.json();
       if (!r.ok || !d.url) throw new Error(d.error || 'สร้างหน้าจ่ายเงินไม่สำเร็จ');

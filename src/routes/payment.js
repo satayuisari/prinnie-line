@@ -3,13 +3,12 @@ const router        = express.Router();
 const subscribers   = require('../services/subscriberService');
 const lineMessaging = require('../services/lineMessaging');
 const stripeService = require('../services/stripeService');
+const { requireAuth } = require('../services/lineAuth');
 
-// POST /api/payment/create-checkout — สร้างหน้าจ่ายเงิน Stripe
-router.post('/create-checkout', async (req, res) => {
-  const { line_user_id } = req.body;
-  if (!line_user_id) return res.status(400).json({ error: 'line_user_id required' });
+// POST /api/payment/create-checkout — สร้างหน้าจ่ายเงิน Stripe (userId จาก token)
+router.post('/create-checkout', requireAuth, async (req, res) => {
   try {
-    const url = await stripeService.createCheckout(line_user_id);
+    const url = await stripeService.createCheckout(req.line.userId);
     res.json({ url });
   } catch (err) {
     console.error('[create-checkout]', err.message);

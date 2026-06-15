@@ -5,22 +5,19 @@ const horoscope   = require('../services/horoscopeService');
 const synastry    = require('../services/synastryService');
 const geocoding   = require('../services/geocodingService');
 const { computeNatalChart } = require('../astro/natalChart');
+const { requireAuth } = require('../services/lineAuth');
 
 // POST /api/line/signup
-// รับข้อมูลเกิดจาก LIFF → คำนวณดวง → เก็บ
-router.post('/signup', async (req, res) => {
-  const {
-    line_user_id, display_name, picture_url,
-    nickname, birth_date, birth_time, birth_place, lat, lng,
-  } = req.body;
-
-  if (!line_user_id || !birth_date) {
-    return res.status(400).json({ error: 'ต้องส่ง line_user_id และ birth_date' });
-  }
+// รับข้อมูลเกิดจาก LIFF → คำนวณดวง → เก็บ (userId มาจาก token ที่ verify แล้ว)
+router.post('/signup', requireAuth, async (req, res) => {
+  const { nickname, birth_date, birth_time, birth_place, lat, lng } = req.body;
+  if (!birth_date) return res.status(400).json({ error: 'ต้องส่ง birth_date' });
 
   try {
     const result = await subscribers.upsertSubscriber({
-      line_user_id, display_name, picture_url,
+      line_user_id: req.line.userId,
+      display_name: req.line.displayName,
+      picture_url:  req.line.pictureUrl,
       nickname, birth_date, birth_time, birth_place, lat, lng,
     });
     res.json(result);
@@ -30,24 +27,19 @@ router.post('/signup', async (req, res) => {
   }
 });
 
-// GET /api/line/member-status?line_user_id=Uxxxx
-router.get('/member-status', async (req, res) => {
-  const { line_user_id } = req.query;
-  if (!line_user_id) return res.status(400).json({ error: 'line_user_id required' });
+// GET /api/line/member-status  (userId จาก token)
+router.get('/member-status', requireAuth, async (req, res) => {
   try {
-    res.json(await subscribers.getMemberStatus(line_user_id));
+    res.json(await subscribers.getMemberStatus(req.line.userId));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// GET /api/line/natal?line_user_id=Uxxxx  — พื้นดวง
-router.get('/natal', async (req, res) => {
-  const { line_user_id } = req.query;
-  if (!line_user_id) return res.status(400).json({ error: 'line_user_id required' });
-
+// GET /api/line/natal — พื้นดวง
+router.get('/natal', requireAuth, async (req, res) => {
   try {
-    const sub = await subscribers.getByLineUserId(line_user_id);
+    const sub = await subscribers.getByLineUserId(req.line.userId);
     if (!sub || !sub.chart_data) return res.status(404).json({ error: 'ยังไม่มีข้อมูลดวง' });
     res.json(await horoscope.natalReading(sub.chart_data));
   } catch (err) {
@@ -55,15 +47,12 @@ router.get('/natal', async (req, res) => {
   }
 });
 
-// GET /api/line/daily-horoscope?line_user_id=Uxxxx&date=2026-06-09
-router.get('/daily-horoscope', async (req, res) => {
-  const { line_user_id, date } = req.query;
-  if (!line_user_id) return res.status(400).json({ error: 'line_user_id required' });
-
+// GET /api/line/daily-horoscope?date=2026-06-09
+router.get('/daily-horoscope', requireAuth, async (req, res) => {
   try {
-    const sub = await subscribers.getByLineUserId(line_user_id);
+    const sub = await subscribers.getByLineUserId(req.line.userId);
     if (!sub || !sub.chart_data) return res.status(404).json({ error: 'ยังไม่มีข้อมูลดวง' });
-    const targetDate = date ? new Date(date) : new Date();
+    const targetDate = req.query.date ? new Date(req.query.date) : new Date();
     res.json(await horoscope.dailyReading(sub.chart_data, targetDate));
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -72,18 +61,12 @@ router.get('/daily-horoscope', async (req, res) => {
 
 // POST /api/line/synastry — ผูกดวงคู่
 // รับวันเกิดของอีกฝ่าย → คำนวณดวงคู่ → เทียบกับดวงของผู้ใช้
-router.post('/synastry', async (req, res) => {
-  const {
-    line_user_id, partner_name,
-    birth_date, birth_time, birth_place, lat, lng,
-  } = req.body;
-
-  if (!line_user_id || !birth_date) {
-    return res.status(400).json({ error: 'ต้องส่ง line_user_id และวันเกิดของคู่' });
-  }
+router.post('/synastry', requireAuth, async (req, res) => {
+  const { partner_name, birth_date, birth_time, birth_place, lat, lng } = req.body;
+  if (!birth_date) return res.status(400).json({ error: 'ต้องส่งวันเกิดของคู่' });
 
   try {
-    const me = await subscribers.getByLineUserId(line_user_id);
+    const me = await subscribers.getByLineUserId(req.line.userId);
     if (!me || !me.chart_data) {
       return res.status(404).json({ error: 'คุณยังไม่มีข้อมูลดวง กรุณาลงทะเบียนดวงของคุณก่อน' });
     }
