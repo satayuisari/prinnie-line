@@ -54,6 +54,37 @@ async function westernText(planet, sign) {
   return r.rows[0] ? stripHtml(r.rows[0].prediction) : null;
 }
 
+// ===== ป้ายกำกับพลังดาว (ใช้ทำหัวข้อ + ตัวคั่นในข้อความดวง) =====
+// แต่ละมุมดาว = พลังคนละตัว → ใส่อีโมจิประจำดาว + ตัวคั่น ให้ผู้อ่านแยกหัวข้อออก
+const PLANET_EMOJI = {
+  Sun: '☀️', Moon: '🌙', Mercury: '💫', Venus: '💖', Mars: '🔥',
+  Jupiter: '🍀', Saturn: '⏳', Neptune: '🌊', Pluto: '🌑',
+};
+const PLANET_TH = {
+  Sun: 'อาทิตย์', Moon: 'จันทร์', Mercury: 'พุธ', Venus: 'ศุกร์', Mars: 'อังคาร',
+  Jupiter: 'พฤหัส', Saturn: 'เสาร์', Neptune: 'เนปจูน', Pluto: 'พลูโต',
+};
+const ASPECT_TH = {
+  Conjunction: 'ร่วม', 'Semi-sextile': 'กึ่งโยน', 'Semi-Square': 'กึ่งฉาก',
+  Sextile: 'โยน', Square: 'ฉาก', Trine: 'ตรีโกณ', Quincunx: 'ปรับมุม', Opposition: 'เล็ง',
+};
+const ASPECT_DIVIDER = '➖➖➖➖➖➖';
+
+// แปลง array มุมดาว → บรรทัดข้อความ: หัวข้อพลังดาว (อีโมจิ+ชื่อไทย) + เนื้อหา + ตัวคั่นระหว่างพลัง
+function aspectBlocks(aspects) {
+  const lines = [];
+  aspects.forEach((a, i) => {
+    if (i > 0) lines.push('', ASPECT_DIVIDER, '');   // ตัวคั่น = พลังดาวคนละตัว
+    const emoji = PLANET_EMOJI[a.aspecting_planet] || '🌟';
+    const name  = PLANET_TH[a.aspecting_planet] || a.aspecting_planet;
+    const rel   = a.aspected_planet
+      ? ` ${ASPECT_TH[a.aspect] || ''} ${PLANET_TH[a.aspected_planet] || a.aspected_planet}`.replace(/\s+/g, ' ').trimEnd()
+      : '';
+    lines.push(`${emoji} พลัง${name}${rel}`, a.text);
+  });
+  return lines;
+}
+
 // ===== ดาวจร (transit) =====
 // แบ่งดาวตามความเร็ว → แต่ละช่วงใช้ "คนละชุด ไม่ทับกัน" (กันดวงแต่ละช่วงซ้ำกัน)
 //   รายวัน  = อาทิตย์/จันทร์ (จันทร์เปลี่ยนทุกวัน)
@@ -151,4 +182,4 @@ async function periodReading(period, chart, date = new Date()) {
   return { period, aspects, tarot, has_content: aspects.length > 0 || !!tarot };
 }
 
-module.exports = { natalReading, dailyReading, periodReading, tarotByType, stripHtml };
+module.exports = { natalReading, dailyReading, periodReading, tarotByType, stripHtml, aspectBlocks };

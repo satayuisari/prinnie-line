@@ -36,8 +36,8 @@ function textQR(text) {
 function formatReading(reading, title, nickname) {
   const lines = [`${title} ของ ${nickname || 'คุณ'}`, ''];
   if (reading.aspects && reading.aspects.length) {
-    lines.push('🌟 ดาวจร');
-    reading.aspects.forEach(a => lines.push(a.text, ''));
+    lines.push('🌟 พลังดาวที่ส่งถึงคุณวันนี้', '');
+    lines.push(...horoscope.aspectBlocks(reading.aspects), '');
   } else {
     lines.push('🌙 ช่วงนี้ดวงดาวของคุณนิ่งสงบ ไม่มีมุมเด่นพิเศษ',
                'เป็นวันสบาย ๆ ขอให้ไพ่ใบนี้นำทางคุณนะคะ ✨', '');

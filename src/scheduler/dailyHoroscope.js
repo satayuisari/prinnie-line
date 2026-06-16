@@ -16,9 +16,7 @@ function formatMessage(reading, nickname) {
   ];
 
   if (reading.has_content) {
-    reading.aspects.forEach((a) => {
-      lines.push(`🔮 ${a.text}`, '');
-    });
+    lines.push(...horoscope.aspectBlocks(reading.aspects), '');
   } else {
     // ดวงนิ่ง/ไม่มีมุมเด่น → ไม่มีคำทำนายซ้ำ ส่งไพ่นำทางแทน
     lines.push(
