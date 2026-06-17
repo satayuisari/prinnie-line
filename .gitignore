@@ -8,8 +8,5 @@ richmenu/.richmenu-id
 tools/
 _skill_inspect/
 
-# วิดีโอโปรโม (สร้างใหม่ได้ด้วย scripts/promo-video.js)
-video/frames/
-video/*.mp4
-video/*.jpg
-video/*.png
+# วิดีโอโปรโม + เฟรมชั่วคราว (สร้างใหม่ได้ด้วย scripts/promo-*.js) — เก็บแต่สคริปต์
+video/
