@@ -9,6 +9,7 @@ const paymentRoutes = require('./routes/payment');
 const webhook       = require('./routes/webhook');
 const stripeWebhook = require('./routes/stripeWebhook');
 const scheduler     = require('./scheduler/dailyHoroscope');
+const nudges        = require('./scheduler/nudges');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -28,6 +29,7 @@ app.use('/api/payment', paymentRoutes);
 app.get('/health', (_, res) => res.json({ ok: true }));
 
 scheduler.start();
+nudges.start();
 
 const mode = process.env.TEST_MODE === 'true' ? '🧪 TEST_MODE (push เฉพาะ allowlist)' : '🚀 PRODUCTION';
 app.listen(PORT, () => {
