@@ -14,7 +14,7 @@ function bubble({ kicker, title, lines, buttonLabel, buttonUri, note }) {
     header: {
       type: 'box', layout: 'vertical', backgroundColor: PURPLE, paddingAll: '18px',
       contents: [
-        ...(kicker ? [{ type: 'text', text: kicker, color: GOLD, size: 'xs', weight: 'bold', letterSpacing: '2px' }] : []),
+        ...(kicker ? [{ type: 'text', text: kicker, color: GOLD, size: 'xs', weight: 'bold' }] : []),
         { type: 'text', text: title, color: '#FFFFFF', size: 'xl', weight: 'bold', wrap: true, margin: kicker ? 'sm' : 'none' },
       ],
     },
