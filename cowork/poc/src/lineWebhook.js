@@ -10,6 +10,7 @@ const approvals = require('./approvals');
 const copilot = require('./copilot');
 const escalations = require('./escalations');
 const lineClient = require('./lineClient');
+const subStats = require('./subscriptionStats');
 
 function buildRouter(orchestrator) {
   const r = express.Router();
@@ -53,6 +54,12 @@ function buildRouter(orchestrator) {
   r.get('/staff/escalations', (_req, res) => res.json(escalations.listOpen()));
   r.post('/staff/escalations/:id/resolve', (req, res) =>
     res.json({ ok: escalations.resolve(req.params.id, req.body?.staffId, req.body?.note) }));
+
+  // subscription stats (read-only จาก DB จริง)
+  r.get('/staff/subscription', async (_req, res) => {
+    try { res.json(await subStats.get()); }
+    catch (e) { res.json({ enabled: false, error: e.message }); }
+  });
 
   // รวมตัวนับสำหรับ badge บนหน้าเว็บ
   r.get('/staff/summary', (_req, res) => res.json({

@@ -9,10 +9,13 @@
     "start": "node src/index.js",
     "demo": "node src/demo.js"
   },
-  "engines": { "node": ">=18" },
+  "engines": {
+    "node": ">=18"
+  },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.90.0",
     "express": "^4.19.2",
-    "@anthropic-ai/sdk": "^0.90.0"
+    "pg": "^8.22.0"
   },
   "comment_dependencies": "@anthropic-ai/sdk ใช้เฉพาะโหมด LIVE (Managed Agents). โหมด STUB/demo ไม่ต้องใช้. LINE push ใช้ fetch ในตัว Node 18+ ไม่ต้องลง @line/bot-sdk"
 }

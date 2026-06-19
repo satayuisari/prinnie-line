@@ -39,6 +39,19 @@
   .pill-kv b { color:var(--txt); }
   .dot { width:8px; height:8px; border-radius:99px; background:var(--ok); display:inline-block; }
   .stale { background:var(--mut); }
+  .substats { display:flex; gap:12px; flex-wrap:wrap; padding:14px 20px 0; }
+  .substats .stat { background:var(--card); border:1px solid var(--line); border-radius:10px;
+                    padding:10px 16px; min-width:96px; }
+  .substats .lbl { display:block; font-size:11px; color:var(--mut); margin-bottom:3px; }
+  .substats .num { font-size:20px; font-weight:700; color:var(--txt); }
+  .tabs { display:flex; gap:4px; padding:0 20px; border-bottom:1px solid var(--line); }
+  .tabbtn { background:none; border:0; color:var(--mut); padding:12px 16px; font-size:14px; font-weight:600;
+            cursor:pointer; border-bottom:2px solid transparent; border-radius:0; }
+  .tabbtn.on { color:var(--txt); border-bottom-color:var(--accent); }
+  .tabbtn .badge { margin-left:6px; }
+  .tab { display:none; } .tab.on { display:block; }
+  .grid2 { display:grid; grid-template-columns:1.4fr 1fr; gap:16px; padding:20px; align-items:start; }
+  @media (max-width:900px){ .grid2{ grid-template-columns:1fr; } }
 </style>
 </head>
 <body>
@@ -49,29 +62,57 @@
   <span class="phase" id="updated">—</span>
 </header>
 
-<div class="grid">
-  <!-- เงิน: ต้องอนุมัติก่อนทำจริง -->
-  <section class="col">
-    <h2>💳 รออนุมัติ (เงิน) <span class="badge" id="c-appr">0</span></h2>
-    <div id="approvals"></div>
-  </section>
+<!-- แท็บ -->
+<div class="tabs">
+  <button class="tabbtn on" id="tab-support" onclick="showTab('support')">🛟 Support <span class="badge" id="c-total">0</span></button>
+  <button class="tabbtn" id="tab-subs" onclick="showTab('subs')">📊 Subscription</button>
+</div>
 
-  <!-- copilot: ร่างคำตอบรอ staff กดส่ง -->
-  <section class="col">
-    <h2>📝 ร่างคำตอบ (กดส่ง) <span class="badge" id="c-draft">0</span></h2>
-    <div id="drafts"></div>
-  </section>
+<!-- TAB 1: Support -->
+<div class="tab on" id="panel-support">
+  <div class="grid">
+    <section class="col">
+      <h2>💳 รออนุมัติ (เงิน) <span class="badge" id="c-appr">0</span></h2>
+      <div id="approvals"></div>
+    </section>
+    <section class="col">
+      <h2>📝 ร่างคำตอบ (กดส่ง) <span class="badge" id="c-draft">0</span></h2>
+      <div id="drafts"></div>
+    </section>
+    <section class="col">
+      <h2>🙋 เคสต้องให้คนดู <span class="badge" id="c-esc">0</span></h2>
+      <div id="escalations"></div>
+    </section>
+  </div>
+</div>
 
-  <!-- alert: อารมณ์ / ร้องเรียน / unknown-intent -->
-  <section class="col">
-    <h2>🙋 เคสต้องให้คนดู <span class="badge" id="c-esc">0</span></h2>
-    <div id="escalations"></div>
-  </section>
+<!-- TAB 2: Subscription -->
+<div class="tab" id="panel-subs">
+  <div id="substats" class="substats" style="display:none">
+    <div class="stat"><span class="lbl">💚 สมาชิก</span><span class="num" id="s-active">–</span></div>
+    <div class="stat"><span class="lbl">💰 MRR</span><span class="num" id="s-mrr">–</span></div>
+    <div class="stat"><span class="lbl">👥 ทั้งหมด</span><span class="num" id="s-total">–</span></div>
+    <div class="stat"><span class="lbl">⏳ รอจ่าย</span><span class="num" id="s-pending">–</span></div>
+    <div class="stat"><span class="lbl">🆕 วันนี้</span><span class="num" id="s-today">–</span></div>
+    <div class="stat"><span class="lbl">⚠️ ใกล้หมด</span><span class="num" id="s-expiring">–</span></div>
+  </div>
+  <div class="grid2">
+    <section class="col" id="recent-col" style="display:none">
+      <h2>🧑 สมัครล่าสุด</h2>
+      <div id="recent"></div>
+    </section>
+  </div>
 </div>
 
 <script>
 const API = ''; // same origin
 const esc = (s) => (s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function showTab(name){
+  document.getElementById('panel-support').classList.toggle('on', name==='support');
+  document.getElementById('panel-subs').classList.toggle('on', name==='subs');
+  document.getElementById('tab-support').classList.toggle('on', name==='support');
+  document.getElementById('tab-subs').classList.toggle('on', name==='subs');
+}
 
 async function jget(p){ const r = await fetch(API+p); return r.json(); }
 async function jpost(p, body){ await fetch(API+p,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body||{})}); refresh(); }
@@ -123,11 +164,36 @@ async function refresh(){
     document.getElementById('c-appr').textContent = appr.length;
     document.getElementById('c-draft').textContent = drafts.length;
     document.getElementById('c-esc').textContent = escs.length;
+    document.getElementById('c-total').textContent = appr.length + drafts.length + escs.length;
     document.getElementById('approvals').innerHTML  = appr.length ? appr.map(approvalCard).join('') : '<div class="empty">ไม่มีรายการรออนุมัติ</div>';
     document.getElementById('drafts').innerHTML      = drafts.length ? drafts.map(draftCard).join('') : '<div class="empty">ไม่มีร่างค้าง</div>';
     document.getElementById('escalations').innerHTML = escs.length ? escs.map(escCard).join('') : '<div class="empty">ไม่มีเคสค้าง</div>';
     document.getElementById('updated').textContent = 'อัปเดต ' + new Date().toLocaleTimeString('th-TH');
     document.getElementById('live').className = 'dot';
+    // subscription stats
+    try {
+      const sub = await jget('/staff/subscription');
+      if (sub && sub.enabled) {
+        document.getElementById('substats').style.display = 'flex';
+        document.getElementById('s-active').textContent   = sub.active;
+        document.getElementById('s-mrr').textContent      = '฿' + (sub.mrr||0).toLocaleString();
+        document.getElementById('s-total').textContent    = sub.total;
+        document.getElementById('s-pending').textContent  = sub.pending;
+        document.getElementById('s-today').textContent    = sub.today;
+        document.getElementById('s-expiring').textContent = sub.expiring;
+        if (sub.recent && sub.recent.length) {
+          document.getElementById('recent-col').style.display = '';
+          const color = st => ({ACTIVE:'#39d98a',PENDING:'#ffb454',EXPIRED:'#9aa3b2',CANCELLED:'#ff5c7a'}[st]||'#9aa3b2');
+          document.getElementById('recent').innerHTML = sub.recent.map(r =>
+            `<div class="card" style="padding:9px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px">
+               <span>${esc(r.name)}</span>
+               <span style="display:flex;gap:8px;align-items:center">
+                 <span class="tag" style="color:${color(r.status)}">${esc(r.status)}</span>
+                 <span class="who" style="color:var(--mut)">${esc(r.created)}</span>
+               </span></div>`).join('');
+        }
+      }
+    } catch(_) {}
   } catch (e) {
     document.getElementById('live').className = 'dot stale';
     document.getElementById('updated').textContent = 'เชื่อมต่อไม่ได้';

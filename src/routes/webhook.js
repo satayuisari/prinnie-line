@@ -1,8 +1,14 @@
 const line        = require('@line/bot-sdk');
 const subscribers = require('../services/subscriberService');
 const horoscope   = require('../services/horoscopeService');
-const { replyMessage, isAllowed, TEST_MODE } = require('../services/lineMessaging');
-const flex        = require('../marketing/flexTemplates');
+const { replyMessage, isAllowed, TEST_MODE, client } = require('../services/lineMessaging');
+const flex         = require('../marketing/flexTemplates');
+const supportInbox = require('../services/supportInbox');
+
+async function lineClient_safeProfile(userId) {
+  try { const p = await client.getProfile(userId); return p && p.displayName; }
+  catch (_) { return null; }
+}
 
 const LIFF_URL = process.env.LINE_LIFF_ID
   ? `https://liff.line.me/${process.env.LINE_LIFF_ID}`
@@ -96,6 +102,15 @@ async function handleEvent(event) {
     if (/คู่|ผูกดวง|ความรัก|แฟน/.test(t)) action = 'synastry';
     else if (/ช่วยเหลือ|วิธีใช้|เมนู|help|สวัสดี|hello|hi|^\?+$/i.test(t)) action = 'help';
     else action = null;
+  }
+
+  // ข้อความที่บอทไม่ตอบ (non-keyword) → เก็บเข้า support inbox ให้ staff ดู/ตอบบน dashboard
+  // (ยังเงียบกับลูกค้าเหมือนเดิม — staff/AI ตอบทีหลังผ่าน dashboard)
+  if (!action && event.type === 'message' && event.message.type === 'text') {
+    let name = null;
+    try { name = (await lineClient_safeProfile(event.source.userId)); } catch (_) {}
+    supportInbox.capture(event.source.userId, name, event.message.text.trim()).catch(() => {});
+    return;
   }
 
   if (!action) return;
