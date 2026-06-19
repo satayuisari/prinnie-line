@@ -1,0 +1,8 @@
+# Container ของ content agents — render คลิป/รูป รันผ่าน custom tool ฝั่งเรา (orchestrator)
+# agent ไม่ต้องต่อเน็ต/ลง ffmpeg เอง
+name: prinnie-content-env
+description: Sandbox สำหรับ content-ops agents ของ Prinnie333 (render ผ่าน host-side tool)
+config:
+  type: cloud
+  networking:
+    type: limited

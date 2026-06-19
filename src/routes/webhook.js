@@ -2,6 +2,7 @@ const line        = require('@line/bot-sdk');
 const subscribers = require('../services/subscriberService');
 const horoscope   = require('../services/horoscopeService');
 const { replyMessage, isAllowed, TEST_MODE } = require('../services/lineMessaging');
+const flex        = require('../marketing/flexTemplates');
 
 const LIFF_URL = process.env.LINE_LIFF_ID
   ? `https://liff.line.me/${process.env.LINE_LIFF_ID}`
@@ -81,10 +82,7 @@ async function handleEvent(event) {
 
   // follow = เพิ่งกด add (หรือ unblock)
   if (event.type === 'follow') {
-    return replyMessage(event.replyToken, {
-      type: 'text',
-      text: `ยินดีต้อนรับสู่ Prinnie333 ✨\nรับดวงส่วนตัวรายวันผ่าน LINE\n\nเริ่มต้นกรอกวันเกิด 👉 ${LIFF_URL}\n\n💡 พิมพ์ "ช่วยเหลือ" เมื่อไรก็ได้ เพื่อดูวิธีใช้งาน`,
-    });
+    return replyMessage(event.replyToken, flex.welcomeCard(LIFF_URL));
   }
 
   // ปุ่ม rich menu ส่ง postback / ข้อความพิมพ์ → เดาเจตนา

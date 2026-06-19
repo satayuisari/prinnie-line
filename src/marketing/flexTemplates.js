@@ -116,4 +116,40 @@ function earlyBirdEnding(liffUrl, deadlineText) {
   }));
 }
 
-module.exports = { launchOffer, upsellSubscribe, coupleTeaser, earlyBirdEnding };
+// 0) Welcome ตอนแอดเพื่อน — ขาย subscription (2 ปุ่ม: เริ่มฟรี / สมัครรายเดือน)
+function welcomeCard(liffUrl) {
+  return msg('🔮 ยินดีต้อนรับสู่ Prinnie333 — รับพื้นดวงฟรี', {
+    type: 'bubble',
+    header: {
+      type: 'box', layout: 'vertical', backgroundColor: PURPLE, paddingAll: '20px',
+      contents: [
+        { type: 'text', text: 'PRINNIE333', color: GOLD, size: 'xs', weight: 'bold' },
+        { type: 'text', text: 'ดวงส่วนตัวรายวัน 🌙', color: '#FFFFFF', size: 'xl', weight: 'bold', wrap: true, margin: 'sm' },
+      ],
+    },
+    body: {
+      type: 'box', layout: 'vertical', paddingAll: '18px', spacing: 'sm', backgroundColor: '#FBF8FF',
+      contents: [
+        { type: 'text', text: 'ดวงเฉพาะคุณ คำนวณจากวันเกิด เวลา สถานที่จริง — ไม่ใช่ดวง 12 ราศีทั่วไป', size: 'sm', color: INK, wrap: true },
+        { type: 'separator', margin: 'md', color: '#E7DCF5' },
+        { type: 'box', layout: 'vertical', margin: 'md', spacing: 'sm', contents: [
+          { type: 'text', text: '☀️  ดวงรายวันเฉพาะคุณ ส่งทุกเช้า', size: 'sm', color: INK, wrap: true },
+          { type: 'text', text: '🌙  พื้นดวง (อาทิตย์/จันทร์/ลัคนา)', size: 'sm', color: INK, wrap: true },
+          { type: 'text', text: '🃏  ไพ่ทาโรต์   ·   💞  ผูกดวงคู่', size: 'sm', color: INK, wrap: true },
+        ] },
+      ],
+    },
+    footer: {
+      type: 'box', layout: 'vertical', paddingAll: '16px', spacing: 'sm', backgroundColor: '#FBF8FF',
+      contents: [
+        { type: 'button', style: 'primary', color: GOLD, height: 'sm',
+          action: { type: 'uri', label: '🎁 เริ่มฟรี · กรอกวันเกิด', uri: liffUrl } },
+        { type: 'button', style: 'secondary', height: 'sm',
+          action: { type: 'uri', label: '☀️ สมัครรับดวงรายวัน 399.-', uri: liffUrl } },
+        { type: 'text', text: 'รับพื้นดวงฟรีก่อน แล้วสมัครรับดวงรายวันต่อได้เลย 💜', size: 'xxs', color: PURPLE_SOFT, align: 'center', wrap: true, margin: 'sm' },
+      ],
+    },
+  });
+}
+
+module.exports = { welcomeCard, launchOffer, upsellSubscribe, coupleTeaser, earlyBirdEnding };

@@ -33,6 +33,16 @@
     input::placeholder { color:rgba(255,255,255,0.35); }
     input:focus { border-color:#c77dff; }
     input:disabled { opacity:0.4; }
+    select {
+      width:100%; padding:12px 10px; border-radius:10px; border:1px solid rgba(255,255,255,0.2);
+      background:rgba(255,255,255,0.08); color:#fff; font-size:1rem; outline:none;
+      -webkit-appearance:none; appearance:none;
+    }
+    select:focus { border-color:#c77dff; }
+    select option { background:#2d0a5a; color:#fff; }
+    .dob { display:flex; gap:8px; margin-bottom:18px; }
+    .dob select { margin:0; }
+    .dob .d { flex:1; } .dob .m { flex:1.4; } .dob .y { flex:1.3; }
     .checkrow { display:flex; align-items:center; gap:8px; margin:-10px 0 18px; }
     .checkrow input { width:auto; margin:0; }
     .checkrow label { margin:0; font-size:0.85rem; }
@@ -75,7 +85,12 @@
     <input type="text" id="nickname" placeholder="เช่น บอน" maxlength="50" />
 
     <label>วันเกิด</label>
-    <input type="date" id="birth_date" />
+    <div class="dob">
+      <select class="d" id="birth_date_d"></select>
+      <select class="m" id="birth_date_m"></select>
+      <select class="y" id="birth_date_y"></select>
+    </div>
+    <input type="hidden" id="birth_date" />
 
     <label>เวลาเกิด</label>
     <input type="time" id="birth_time" />
@@ -116,7 +131,12 @@
     <input type="text" id="c_nickname" placeholder="เช่น มายด์" maxlength="50" />
 
     <label>วันเกิดของคู่</label>
-    <input type="date" id="c_birth_date" />
+    <div class="dob">
+      <select class="d" id="c_birth_date_d"></select>
+      <select class="m" id="c_birth_date_m"></select>
+      <select class="y" id="c_birth_date_y"></select>
+    </div>
+    <input type="hidden" id="c_birth_date" />
 
     <label>เวลาเกิดของคู่</label>
     <input type="time" id="c_birth_time" />
@@ -148,7 +168,40 @@
   let isActiveMember = false;   // เป็นสมาชิกที่ใช้งานอยู่ → โหมดแก้ไข (ไม่ต้องจ่ายซ้ำ)
   let lastCoupleInput = null;   // ข้อมูลคู่ล่าสุด (ใช้ตอนกดปลดล็อก 149)
 
+  // ---- dropdown วัน/เดือน/ปี (เลือกง่ายกว่า input type=date บนมือถือ; ปีโชว์ พ.ศ. เก็บค่า ค.ศ.) ----
+  const TH_MONTHS = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  function fillDob(prefix) {
+    const d = document.getElementById(prefix+'_d');
+    const m = document.getElementById(prefix+'_m');
+    const y = document.getElementById(prefix+'_y');
+    d.innerHTML = '<option value="">วัน</option>' +
+      Array.from({length:31},(_,i)=>`<option value="${i+1}">${i+1}</option>`).join('');
+    m.innerHTML = '<option value="">เดือน</option>' +
+      TH_MONTHS.map((mm,i)=>`<option value="${i+1}">${mm}</option>`).join('');
+    const now = new Date().getFullYear();
+    let yo = '<option value="">ปี (พ.ศ.)</option>';
+    for (let yr=now; yr>=now-100; yr--) yo += `<option value="${yr}">${yr+543}</option>`;
+    y.innerHTML = yo;
+    [d,m,y].forEach(el => el.addEventListener('change', () => composeDob(prefix)));
+  }
+  function composeDob(prefix) {
+    const d = document.getElementById(prefix+'_d').value;
+    const m = document.getElementById(prefix+'_m').value;
+    const y = document.getElementById(prefix+'_y').value;
+    document.getElementById(prefix).value =
+      (d && m && y) ? `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}` : '';
+  }
+  function setDob(prefix, ymd) {
+    if (!ymd) return;
+    const [y,m,d] = String(ymd).split('-').map(Number);
+    document.getElementById(prefix+'_y').value = y;
+    document.getElementById(prefix+'_m').value = m;
+    document.getElementById(prefix+'_d').value = d;
+    composeDob(prefix);
+  }
+
   async function initLiff() {
+    fillDob('birth_date'); fillDob('c_birth_date');
     await liff.init({ liffId: LIFF_ID });
     // ใน LINE app ไม่ต้อง login (มี session อยู่แล้ว) — เรียก login เฉพาะเปิดนอกแอป
     if (!liff.isLoggedIn() && !liff.isInClient()) {
@@ -215,7 +268,7 @@
   // เติมข้อมูลเกิดเดิมลงฟอร์ม
   function prefillForm(s) {
     if (s.nickname)    document.getElementById('nickname').value   = s.nickname;
-    if (s.birth_date)  document.getElementById('birth_date').value = s.birth_date;
+    if (s.birth_date)  setDob('birth_date', s.birth_date);
     if (s.birth_place) document.getElementById('birth_place').value = s.birth_place;
     // เวลาเกิด: ถ้าไม่ทราบเวลา → ติ๊ก checkbox + disable
     if (s.birth_time_known === false || !s.birth_time) {

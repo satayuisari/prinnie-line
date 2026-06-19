@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Prinnie333 — Staff Console</title>
+<style>
+  :root { --bg:#0f1115; --card:#1a1d24; --line:#2a2e38; --txt:#e7e9ee; --mut:#9aa3b2;
+          --hi:#ff5c7a; --ok:#39d98a; --warn:#ffb454; --accent:#6ea8fe; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system,"Segoe UI",Roboto,"Noto Sans Thai",sans-serif;
+         background:var(--bg); color:var(--txt); }
+  header { display:flex; align-items:center; gap:12px; padding:14px 20px; border-bottom:1px solid var(--line);
+           position:sticky; top:0; background:var(--bg); z-index:5; }
+  header h1 { font-size:16px; margin:0; font-weight:600; }
+  .phase { font-size:12px; color:var(--mut); border:1px solid var(--line); padding:2px 8px; border-radius:99px; }
+  .grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; padding:20px; align-items:start; }
+  @media (max-width:900px){ .grid{ grid-template-columns:1fr; } }
+  .col h2 { font-size:13px; text-transform:uppercase; letter-spacing:.5px; color:var(--mut);
+            margin:0 0 10px; display:flex; align-items:center; gap:8px; }
+  .badge { background:var(--line); color:var(--txt); border-radius:99px; padding:1px 8px; font-size:12px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:12px; }
+  .card.hi { border-left:3px solid var(--hi); }
+  .card.money { border-left:3px solid var(--warn); }
+  .meta { font-size:12px; color:var(--mut); margin-bottom:6px; display:flex; gap:8px; flex-wrap:wrap; }
+  .tag { background:var(--line); border-radius:6px; padding:1px 6px; }
+  .tag.hi { background:rgba(255,92,122,.18); color:var(--hi); }
+  .who { font-family:ui-monospace,monospace; font-size:12px; color:var(--accent); }
+  .summary { font-size:13px; color:var(--mut); margin:6px 0; }
+  textarea { width:100%; background:#11141a; color:var(--txt); border:1px solid var(--line);
+             border-radius:8px; padding:8px; font:inherit; font-size:13px; resize:vertical; min-height:70px; }
+  .row { display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
+  button { border:0; border-radius:8px; padding:7px 12px; font-size:13px; cursor:pointer; font-weight:600; }
+  .b-ok { background:var(--ok); color:#06281a; }
+  .b-no { background:transparent; color:var(--mut); border:1px solid var(--line); }
+  .b-warn { background:var(--warn); color:#3a2606; }
+  .empty { color:var(--mut); font-size:13px; padding:20px; text-align:center; border:1px dashed var(--line); border-radius:12px; }
+  .pill-kv { font-size:12px; }
+  .pill-kv b { color:var(--txt); }
+  .dot { width:8px; height:8px; border-radius:99px; background:var(--ok); display:inline-block; }
+  .stale { background:var(--mut); }
+</style>
+</head>
+<body>
+<header>
+  <span class="dot" id="live"></span>
+  <h1>Prinnie333 · Staff Console</h1>
+  <span class="phase" id="phase">phase ?</span>
+  <span class="phase" id="updated">—</span>
+</header>
+
+<div class="grid">
+  <!-- เงิน: ต้องอนุมัติก่อนทำจริง -->
+  <section class="col">
+    <h2>💳 รออนุมัติ (เงิน) <span class="badge" id="c-appr">0</span></h2>
+    <div id="approvals"></div>
+  </section>
+
+  <!-- copilot: ร่างคำตอบรอ staff กดส่ง -->
+  <section class="col">
+    <h2>📝 ร่างคำตอบ (กดส่ง) <span class="badge" id="c-draft">0</span></h2>
+    <div id="drafts"></div>
+  </section>
+
+  <!-- alert: อารมณ์ / ร้องเรียน / unknown-intent -->
+  <section class="col">
+    <h2>🙋 เคสต้องให้คนดู <span class="badge" id="c-esc">0</span></h2>
+    <div id="escalations"></div>
+  </section>
+</div>
+
+<script>
+const API = ''; // same origin
+const esc = (s) => (s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+async function jget(p){ const r = await fetch(API+p); return r.json(); }
+async function jpost(p, body){ await fetch(API+p,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body||{})}); refresh(); }
+
+function approvalCard(a){
+  const inp = a.input || {};
+  return `<div class="card money">
+    <div class="meta"><span class="tag">${esc(a.toolName)}</span><span class="who">${esc(a.lineUserId||'-')}</span></div>
+    <div class="pill-kv">${Object.entries(inp).map(([k,v])=>`<div><b>${esc(k)}</b>: ${esc(String(v))}</div>`).join('')}</div>
+    <div class="row">
+      <button class="b-ok" onclick="jpost('/staff/approvals/${a.id}/approve',{staffId:'web'})">อนุมัติ</button>
+      <button class="b-no" onclick="(async()=>{const n=prompt('เหตุผลที่ปฏิเสธ (ถ้ามี)');await jpost('/staff/approvals/${a.id}/reject',{staffId:'web',note:n});})()">ปฏิเสธ</button>
+    </div>
+  </div>`;
+}
+function draftCard(d){
+  return `<div class="card">
+    <div class="meta"><span class="tag">${esc(d.agentTag)}</span><span class="who">${esc(d.lineUserId)}</span></div>
+    <textarea id="t_${d.id}">${esc(d.text)}</textarea>
+    <div class="row">
+      <button class="b-ok" onclick="jpost('/staff/drafts/${d.id}/send',{text:document.getElementById('t_${d.id}').value})">ส่งให้ลูกค้า</button>
+      <button class="b-no" onclick="jpost('/staff/drafts/${d.id}/discard')">ทิ้ง</button>
+    </div>
+  </div>`;
+}
+function escCard(t){
+  const hi = t.priority === 'high';
+  return `<div class="card ${hi?'hi':''}">
+    <div class="meta">
+      <span class="tag ${hi?'hi':''}">${esc(t.label)}</span>
+      <span class="who">${esc(t.lineUserId)}</span>
+    </div>
+    ${t.lastMessage?`<div class="summary">💬 “${esc(t.lastMessage)}”</div>`:''}
+    ${t.summary?`<div class="summary">📋 ${esc(t.summary)}</div>`:''}
+    ${t.draftReply?`<textarea id="e_${t.id}">${esc(t.draftReply)}</textarea>`:''}
+    <div class="row">
+      ${t.draftReply?`<button class="b-ok" onclick="alert('PoC: คัดลอกข้อความนี้ตอบลูกค้า / หรือผูกปุ่มส่งจริงภายหลัง')">ใช้ร่างนี้ตอบ</button>`:''}
+      <button class="b-no" onclick="jpost('/staff/escalations/${t.id}/resolve',{staffId:'web'})">ทำเรียบร้อยแล้ว</button>
+    </div>
+  </div>`;
+}
+
+async function refresh(){
+  try {
+    const [s, appr, drafts, escs] = await Promise.all([
+      jget('/staff/summary'), jget('/staff/approvals'), jget('/staff/drafts'), jget('/staff/escalations'),
+    ]);
+    document.getElementById('phase').textContent = 'phase ' + (s.phase ?? '?');
+    document.getElementById('c-appr').textContent = appr.length;
+    document.getElementById('c-draft').textContent = drafts.length;
+    document.getElementById('c-esc').textContent = escs.length;
+    document.getElementById('approvals').innerHTML  = appr.length ? appr.map(approvalCard).join('') : '<div class="empty">ไม่มีรายการรออนุมัติ</div>';
+    document.getElementById('drafts').innerHTML      = drafts.length ? drafts.map(draftCard).join('') : '<div class="empty">ไม่มีร่างค้าง</div>';
+    document.getElementById('escalations').innerHTML = escs.length ? escs.map(escCard).join('') : '<div class="empty">ไม่มีเคสค้าง</div>';
+    document.getElementById('updated').textContent = 'อัปเดต ' + new Date().toLocaleTimeString('th-TH');
+    document.getElementById('live').className = 'dot';
+  } catch (e) {
+    document.getElementById('live').className = 'dot stale';
+    document.getElementById('updated').textContent = 'เชื่อมต่อไม่ได้';
+  }
+}
+// /health มี phase แต่ /staff/summary ไม่มี — ดึง phase แยก
+jget('/health').then(h => document.getElementById('phase').textContent = 'phase ' + (h.phase ?? '?')).catch(()=>{});
+refresh();
+setInterval(refresh, 2500); // poll
+</script>
+</body>
+</html>

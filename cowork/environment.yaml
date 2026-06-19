@@ -1,0 +1,8 @@
+# Container ที่ agent ทำงาน — ทุกเครื่องมือเป็น custom tool ฝั่งเรา (orchestrator)
+# agent ไม่ต้องต่อเน็ตออกเอง จึงปิด egress ได้ (ลด attack surface)
+name: prinnie-support-env
+description: Sandbox สำหรับ support agents ของ Prinnie333 LINE OA (tool ทั้งหมด host-side)
+config:
+  type: cloud
+  networking:
+    type: limited        # deny-by-default; ไม่ต้อง allow host ใด เพราะ tool อยู่ฝั่งเรา

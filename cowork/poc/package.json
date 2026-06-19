@@ -1,0 +1,18 @@
+{
+  "name": "prinnie-support-orchestrator-poc",
+  "version": "0.1.0",
+  "private": true,
+  "description": "เฟส 1 (copilot) orchestrator: รับ custom_tool_use จาก Managed Agents → เรียกฟังก์ชัน prinnie-line → คืนผล + gate เรื่องเงิน + ร่างให้ staff กดส่ง",
+  "type": "commonjs",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "demo": "node src/demo.js"
+  },
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "express": "^4.19.2",
+    "@anthropic-ai/sdk": "^0.90.0"
+  },
+  "comment_dependencies": "@anthropic-ai/sdk ใช้เฉพาะโหมด LIVE (Managed Agents). โหมด STUB/demo ไม่ต้องใช้. LINE push ใช้ fetch ในตัว Node 18+ ไม่ต้องลง @line/bot-sdk"
+}

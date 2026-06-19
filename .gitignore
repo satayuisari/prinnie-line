@@ -10,3 +10,9 @@ _skill_inspect/
 
 # วิดีโอโปรโม + เฟรมชั่วคราว (สร้างใหม่ได้ด้วย scripts/promo-*.js) — เก็บแต่สคริปต์
 video/
+
+# ไฟล์ดิบจากแม่ (เสียง) + รูป Midjourney — ใหญ่/ส่วนตัว เก็บนอก git
+content/raw/
+
+# skill ที่ unzip มา (อ้างอิงเฉย ๆ) — ไม่ commit ตัวเต็ม
+.skills-tmp/

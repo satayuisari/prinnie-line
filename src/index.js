@@ -8,6 +8,7 @@ const lineRoutes    = require('./routes/line');
 const paymentRoutes = require('./routes/payment');
 const webhook       = require('./routes/webhook');
 const stripeWebhook = require('./routes/stripeWebhook');
+const dashboard     = require('./routes/dashboard');
 const scheduler     = require('./scheduler/dailyHoroscope');
 const nudges        = require('./scheduler/nudges');
 
@@ -26,6 +27,7 @@ app.use(express.static('liff'));
 app.use('/api/line',    lineRoutes);
 app.use('/api/payment', paymentRoutes);
 
+dashboard.register(app);   // /dashboard?key=DASHBOARD_KEY
 app.get('/health', (_, res) => res.json({ ok: true }));
 
 scheduler.start();
