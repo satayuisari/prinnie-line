@@ -79,6 +79,22 @@ function formatNatal(r) {
   return parts.join('\n').trim().slice(0, 4900); // LINE จำกัด 5000 ตัว
 }
 
+// แปลงสถานะสมาชิกจริง (getMemberStatus) → ข้อความบริบทให้ AI ตอบตรงตัวบุคคล
+function memberContext(ms) {
+  if (!ms || ms.status === 'NOT_FOUND') {
+    return `สถานะ: ยังไม่ลงทะเบียน (ยังไม่เคยกรอกวันเกิด). ค่าสมาชิก 399 บาท/เดือน. ลิงก์เริ่มต้น/สมัคร: ${LIFF_URL}`;
+  }
+  const name = ms.nickname ? `ชื่อเล่น: ${ms.nickname}. ` : '';
+  if (ms.status === 'ACTIVE') {
+    const d = ms.expire_date ? new Date(ms.expire_date).toLocaleDateString('th-TH') : '-';
+    return `${name}สถานะสมาชิก: ACTIVE (ใช้งานได้) หมดอายุ ${d}. ราคาต่ออายุ 399 บาท/เดือน.`;
+  }
+  if (ms.status === 'EXPIRED') {
+    return `${name}สถานะสมาชิก: หมดอายุแล้ว. ต่ออายุ 399 บาท/เดือน ลิงก์: ${LIFF_URL}`;
+  }
+  return `${name}สถานะสมาชิก: PENDING (ลงทะเบียนแล้วแต่ยังไม่ชำระ). ค่าสมาชิก 399 บาท/เดือน ลิงก์ชำระ: ${LIFF_URL}`;
+}
+
 async function handleEvent(event) {
   // ════════ SAFETY: ตอน TEST_MODE ไม่ตอบ/ไม่ทำอะไรกับคนนอก allowlist ════════
   // กัน follower จริงที่บังเอิญทักมาในช่วงเทส เห็น auto-reply แล้วรู้ตัว
@@ -119,7 +135,13 @@ async function handleEvent(event) {
     if (id && process.env.AI_AUTOREPLY === 'true' && supportAI.isEnabled()) {
       const { category } = triage.classify(text);
       if (supportInbox.AUTO_REPLY.has(category)) {
-        const ans = await supportAI.generate(text, category);
+        const ms = await subscribers.getMemberStatus(event.source.userId).catch(() => null);
+        // 🛡️ ข้อพิพาทการจ่าย: ลูกค้าอ้างว่าจ่ายแล้วแต่ระบบยังไม่ ACTIVE → ให้คนตรวจสอบจริง ไม่ให้บอทตอบ
+        const claimsPaid = /จ่ายแล้ว|โอนแล้ว|ชำระแล้ว|ตัดเงิน|เงินออก|สลิป/.test(text);
+        if (category === 'payment' && claimsPaid && (!ms || ms.status !== 'ACTIVE')) {
+          return; // เงียบ → staff เช็คการชำระเอง (ข้อความอยู่ใน inbox แล้ว)
+        }
+        const ans = await supportAI.generate(text, category, memberContext(ms));
         if (ans) {
           await supportInbox.markAutoReplied(id, ans).catch(() => {});
           return replyMessage(event.replyToken, { type: 'text', text: ans.slice(0, 4900) });

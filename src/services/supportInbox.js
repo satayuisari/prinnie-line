@@ -4,8 +4,9 @@ const { pushText } = require('./lineMessaging');
 const triage = require('./supportTriage');
 const supportAI = require('./supportAI');
 
-// หมวดที่ "บอทตอบเอง" ได้ (ปลอดภัย) — เงิน/อารมณ์/โกรธ ไม่อยู่ในนี้ → ให้คนตอบ
-const AUTO_REPLY = new Set(['astro', 'general']);
+// หมวดที่ "บอทตอบเอง" ได้ — payment ตอบสถานะ/ราคาตามข้อมูลจริง (ดู guard ข้อพิพาทใน webhook)
+// อารมณ์/โกรธ(ร้องเรียน/คืนเงิน) ไม่อยู่ในนี้ → ให้คนตอบเสมอ
+const AUTO_REPLY = new Set(['astro', 'general', 'payment']);
 
 // เก็บข้อความเข้า inbox (กันสแปม: ถ้ามี OPEN ของ user เดิม + ข้อความซ้ำใน 60 วิ ไม่เก็บซ้ำ)
 async function capture(lineUserId, displayName, message) {
