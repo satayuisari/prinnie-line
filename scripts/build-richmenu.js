@@ -11,23 +11,23 @@ const bgPath  = path.join(DIR, 'bg.png');
 const outPath = path.join(DIR, 'richmenu.jpg');
 
 (async () => {
-  // 1) render ไอคอน+ข้อความ เป็นเลเยอร์โปร่งใส
+  // richmenu.svg เป็นดีไซน์เต็มใบ (มีพื้นหลัง+การ์ด+ไอคอน+ข้อความในตัว) → render ตรงเป็น JPEG
+  // (ดีไซน์ luxe เลิกใช้ bg.png นีบิวลาเดิมแล้ว — ตั้ง USE_BG=1 ถ้าอยากกลับไป composite ทับ bg.png)
   const svg   = fs.readFileSync(svgPath);
   const resvg = new Resvg(svg, { fitTo: { mode: 'width', value: 2500 }, font: { loadSystemFonts: true } });
-  const overlay = resvg.render().asPng();
+  const layer = resvg.render().asPng();
 
-  // 2) พื้นหลัง AI (resize cover 2500x1686) + วางเลเยอร์ทับ → JPEG
   let out;
-  if (fs.existsSync(bgPath)) {
+  if (process.env.USE_BG === '1' && fs.existsSync(bgPath)) {
     out = await sharp(bgPath)
       .resize(2500, 1686, { fit: 'cover' })
-      .composite([{ input: overlay }])
+      .composite([{ input: layer }])
       .jpeg({ quality: 90 })
       .toBuffer();
-    console.log('composite: bg.png + ไอคอน/ข้อความ');
+    console.log('composite: bg.png + overlay (USE_BG=1)');
   } else {
-    out = await sharp(overlay).flatten({ background: '#1a0533' }).jpeg({ quality: 90 }).toBuffer();
-    console.log('⚠️ ไม่มี bg.png — ใช้พื้นทึบ');
+    out = await sharp(layer).flatten({ background: '#0a0218' }).jpeg({ quality: 92 }).toBuffer();
+    console.log('render: self-contained SVG (luxe)');
   }
 
   fs.writeFileSync(outPath, out);
