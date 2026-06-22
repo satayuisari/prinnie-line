@@ -4,6 +4,8 @@ const horoscope   = require('../services/horoscopeService');
 const { replyMessage, isAllowed, TEST_MODE, client } = require('../services/lineMessaging');
 const flex         = require('../marketing/flexTemplates');
 const supportInbox = require('../services/supportInbox');
+const supportAI    = require('../services/supportAI');
+const triage       = require('../services/supportTriage');
 
 async function lineClient_safeProfile(userId) {
   try { const p = await client.getProfile(userId); return p && p.displayName; }
@@ -104,13 +106,27 @@ async function handleEvent(event) {
     else action = null;
   }
 
-  // ข้อความที่บอทไม่ตอบ (non-keyword) → เก็บเข้า support inbox ให้ staff ดู/ตอบบน dashboard
-  // (ยังเงียบกับลูกค้าเหมือนเดิม — staff/AI ตอบทีหลังผ่าน dashboard)
+  // ข้อความที่บอทไม่ตอบ (non-keyword) → เก็บเข้า support inbox
+  // 🤖 AI auto-reply (เปิดเมื่อ ANTHROPIC_API_KEY + AI_AUTOREPLY=true): บอทตอบเองเฉพาะหมวด
+  //    ปลอดภัย (ถามดวง/ทั่วไป). เงิน/อารมณ์/โกรธ → เงียบ ให้ staff ตอบบน dashboard.
+  //    ถ้าไม่เปิด/ไม่เข้าเงื่อนไข → พฤติกรรมเดิม: เงียบ เก็บเข้า inbox อย่างเดียว
   if (!action && event.type === 'message' && event.message.type === 'text') {
+    const text = event.message.text.trim();
     let name = null;
     try { name = (await lineClient_safeProfile(event.source.userId)); } catch (_) {}
-    supportInbox.capture(event.source.userId, name, event.message.text.trim()).catch(() => {});
-    return;
+    const id = await supportInbox.capture(event.source.userId, name, text).catch(() => null);
+
+    if (id && process.env.AI_AUTOREPLY === 'true' && supportAI.isEnabled()) {
+      const { category } = triage.classify(text);
+      if (supportInbox.AUTO_REPLY.has(category)) {
+        const ans = await supportAI.generate(text, category);
+        if (ans) {
+          await supportInbox.markAutoReplied(id, ans).catch(() => {});
+          return replyMessage(event.replyToken, { type: 'text', text: ans.slice(0, 4900) });
+        }
+      }
+    }
+    return; // เงียบ → staff ตอบบน dashboard
   }
 
   if (!action) return;

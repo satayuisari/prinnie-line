@@ -2,6 +2,10 @@
 const db = require('../db');
 const { pushText } = require('./lineMessaging');
 const triage = require('./supportTriage');
+const supportAI = require('./supportAI');
+
+// หมวดที่ "บอทตอบเอง" ได้ (ปลอดภัย) — เงิน/อารมณ์/โกรธ ไม่อยู่ในนี้ → ให้คนตอบ
+const AUTO_REPLY = new Set(['astro', 'general']);
 
 // เก็บข้อความเข้า inbox (กันสแปม: ถ้ามี OPEN ของ user เดิม + ข้อความซ้ำใน 60 วิ ไม่เก็บซ้ำ)
 async function capture(lineUserId, displayName, message) {
@@ -38,15 +42,24 @@ async function saveDraft(id, draft) {
   await db.query(`UPDATE support_inbox SET ai_draft=$2 WHERE id=$1`, [id, draft]);
 }
 
-// staff กดส่ง → push หาลูกค้าจริง + mark REPLIED
+// staff กดส่ง → push หาลูกค้าจริง + mark REPLIED (handled_by=staff)
 async function reply(id, text) {
   const r = await db.query(`SELECT line_user_id FROM support_inbox WHERE id=$1`, [id]);
   if (!r.rows.length) return { ok: false, error: 'not_found' };
   await pushText(r.rows[0].line_user_id, text);
   await db.query(
-    `UPDATE support_inbox SET status='REPLIED', reply_text=$2, replied_at=NOW() WHERE id=$1`,
+    `UPDATE support_inbox SET status='REPLIED', reply_text=$2, replied_at=NOW(), handled_by='staff' WHERE id=$1`,
     [id, text]);
   return { ok: true };
+}
+
+// บอทตอบเอง (auto-reply) → mark REPLIED + handled_by=bot (ไม่ push ซ้ำ; ผู้เรียกส่งผ่าน reply token แล้ว)
+// ไว้ตรวจคุณภาพบอทบน dashboard และไม่ให้เคสค้างใน OPEN queue ของ staff
+async function markAutoReplied(id, text) {
+  if (!id) return;
+  await db.query(
+    `UPDATE support_inbox SET status='REPLIED', reply_text=$2, replied_at=NOW(), handled_by='bot' WHERE id=$1`,
+    [id, text]);
 }
 
 async function close(id) {
@@ -54,4 +67,4 @@ async function close(id) {
   return { ok: true };
 }
 
-module.exports = { capture, listOpen, counts, saveDraft, reply, close };
+module.exports = { capture, listOpen, counts, saveDraft, reply, markAutoReplied, close, AUTO_REPLY };

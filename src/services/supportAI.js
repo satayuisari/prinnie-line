@@ -44,6 +44,32 @@ async function draft(inboxId, message) {
   }
 }
 
+// generate — คำตอบที่ "ส่งให้ลูกค้าตรง" (auto-reply) ตาม persona หมวด
+// ใช้เฉพาะหมวดปลอดภัย (astro/general/faq) — เงิน/อารมณ์/โกรธ ไม่เรียกตัวนี้ (ให้คนตอบ)
+const NUANCE = {
+  astro: 'ลูกค้าถามเรื่องดวง/บริการดูดวง — อธิบายอย่างอบอุ่น โทนบวก ชวนกรอกวันเกิด/แอดรับพื้นดวงฟรี ห้ามทำนายฟันธงแง่ร้าย',
+  general: 'ลูกค้าถามทั่วไป/สนใจบริการ — แนะนำบริการสั้น ๆ ชวนเริ่มรับพื้นดวงฟรี หรือพิมพ์ "ช่วยเหลือ" ดูเมนู',
+  faq: 'ตอบคำถามบริการทั่วไป กระชับ ชัดเจน',
+};
+
+async function generate(message, category) {
+  const c = getClient();
+  if (!c) return null;
+  try {
+    const resp = await c.messages.create({
+      model: MODEL,
+      max_tokens: 600,
+      system: SYSTEM + '\n\nบริบทหมวดนี้: ' + (NUANCE[category] || NUANCE.general),
+      messages: [{ role: 'user', content: `ลูกค้าพิมพ์มาว่า: "${message}"` }],
+    });
+    const text = (resp.content || []).filter(b => b.type === 'text').map(b => b.text).join('').trim();
+    return text || null;
+  } catch (e) {
+    console.error('[supportAI] generate error:', e.message);
+    return null;
+  }
+}
+
 const isEnabled = () => !!process.env.ANTHROPIC_API_KEY;
 
-module.exports = { draft, isEnabled };
+module.exports = { draft, generate, isEnabled };
