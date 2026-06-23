@@ -13,8 +13,9 @@ const sharp = require('sharp');
 const ART = path.join(__dirname, '..', 'marketing', 'art');
 const OUT = path.join(__dirname, '..', 'marketing', 'posters');
 fs.mkdirSync(OUT, { recursive: true });
-// ฟอนต์ไทย: Leelawadee จัดสระ/วรรณยุกต์ถูกถ้าไม่ใส่ stroke หนา + ห้าม letter-spacing กับไทย
-const FONT = "'Leelawadee UI','Tahoma','Noto Sans Thai',sans-serif";
+// ฟอนต์ไทย: Tahoma จัดสระ ำ + วรรณยุกต์ (รวมเคสยาก น้ำ/ค่ำ) ถูกต้องสุดใน resvg
+// (Leelawadee ตัวหนาเบียดนิคหิตของ ำ จนเพี้ยน) + ห้าม letter-spacing กับไทย
+const FONT = "'Tahoma','Leelawadee UI','Noto Sans Thai',sans-serif";
 
 const FORMATS = {
   feed:   { w: 896,  h: 1216, art: '',      out: '' },        // 4:5 — IG/FB feed + LINE
@@ -24,6 +25,7 @@ const FORMATS = {
 };
 
 // พาดหัว/ซับ/CTA ต่อคอนเซ็ปต์ — หลักการ: ขายความเป็นส่วนตัว ไม่พูดราคา
+// ⚠️ เลี่ยงลำดับ "ำ ตามด้วยสระหน้า (เ แ โ ใ ไ)" — resvg shape ผิด (เช่น "คำแนะนำเฉพาะ" เพี้ยน)
 const POSTERS = {
   personal: {
     head: ['ราศีเดียวกัน', 'ดวงไม่เหมือนกัน'],
@@ -32,7 +34,7 @@ const POSTERS = {
   },
   daily: {
     head: ['ทุกเช้า', 'เริ่มด้วยดวงที่รู้จักคุณ'],
-    sub:  'คำแนะนำเฉพาะคุณ ส่งถึงทุกเช้า บน LINE',
+    sub:  'คำแนะนำส่วนตัว ส่งถึงคุณทุกเช้า บน LINE',
     cta:  'แอด LINE ฟรี  ·  @prinnie333',
   },
   couple: {
@@ -50,7 +52,7 @@ function buildSvg(p, W, H) {
   const headSize = compact ? (multi ? 54 : 66) : (multi ? 78 : 92);
   const headLineH = headSize + (compact ? 12 : 22);
   const headStartY = compact ? 96 : 150;
-  const subSize = compact ? 30 : 36;
+  const subSize = compact ? 32 : 40;
   const ctaSize = compact ? 30 : 34;
   const pillH = compact ? 72 : 92;
   const headEls = p.head.map((line, i) =>
@@ -73,7 +75,8 @@ function buildSvg(p, W, H) {
       </linearGradient>
       <linearGradient id="botScrim" x1="0" y1="0" x2="0" y2="1">
         <stop offset="0%" stop-color="#0a0218" stop-opacity="0"/>
-        <stop offset="100%" stop-color="#0a0218" stop-opacity="0.92"/>
+        <stop offset="45%" stop-color="#0a0218" stop-opacity="0.62"/>
+        <stop offset="100%" stop-color="#0a0218" stop-opacity="0.97"/>
       </linearGradient>
     </defs>
 
@@ -87,8 +90,9 @@ function buildSvg(p, W, H) {
     </g>
     <rect x="${W/2-70}" y="${headStartY + p.head.length*headLineH - 30}" width="140" height="4" rx="2" fill="url(#gold)"/>
 
-    <text x="${W/2}" y="${subY}" text-anchor="middle" font-size="${subSize}" font-weight="500"
-          fill="#f6ecd2" stroke="#0a0218" stroke-width="1.6" paint-order="stroke" stroke-linejoin="round">${esc(p.sub)}</text>
+    <!-- ซับ: ไม่มี stroke (stroke ทำให้ เ+ฉ เบียดที่ขนาดเล็ก) → พึ่ง scrim เข้มแทน -->
+    <text x="${W/2}" y="${subY}" text-anchor="middle" font-size="${subSize}" font-weight="400"
+          fill="#f6ecd2">${esc(p.sub)}</text>
 
     <rect x="${pillX}" y="${pillY}" width="${pillW}" height="${pillH}" rx="${pillH/2}"
           fill="url(#gold)" stroke="#fff7e2" stroke-width="1.5"/>
