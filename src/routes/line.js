@@ -5,8 +5,33 @@ const horoscope   = require('../services/horoscopeService');
 const synastry    = require('../services/synastryService');
 const geocoding   = require('../services/geocodingService');
 const stripeService = require('../services/stripeService');
+const coupleCard  = require('../services/coupleCard');
 const { computeNatalChart } = require('../astro/natalChart');
 const { requireAuth } = require('../services/lineAuth');
+
+// base URL สาธารณะ (สำหรับลิงก์การ์ดที่แชร์ออกนอก/ส่งเป็น image message)
+function baseUrl(req) {
+  return (process.env.PUBLIC_BASE_URL ||
+    `${req.headers['x-forwarded-proto'] || req.protocol}://${req.get('host')}`).replace(/\/$/, '');
+}
+function coupleCardUrl(req, score, a, b) {
+  const q = `score=${score}&a=${encodeURIComponent(a || 'คุณ')}&b=${encodeURIComponent(b || 'คู่ของคุณ')}`;
+  return `${baseUrl(req)}/api/line/couple-card.jpg?${q}`;
+}
+
+// GET /api/line/couple-card.jpg — การ์ดผูกดวงคู่แชร์ได้ (public, render จาก query ไม่มี PII)
+router.get('/couple-card.jpg', async (req, res) => {
+  try {
+    const score = Math.max(0, Math.min(100, parseInt(req.query.score, 10) || 0));
+    const buf = await coupleCard.render({ score, a: req.query.a, b: req.query.b });
+    res.set('Content-Type', 'image/jpeg');
+    res.set('Cache-Control', 'public, max-age=86400');
+    res.send(buf);
+  } catch (e) {
+    console.error('[couple-card]', e.message);
+    res.status(500).end();
+  }
+});
 
 // POST /api/line/signup
 // รับข้อมูลเกิดจาก LIFF → คำนวณดวง → เก็บ (userId มาจาก token ที่ verify แล้ว)
@@ -89,6 +114,7 @@ router.post('/synastry', requireAuth, async (req, res) => {
       me:      { sun: me.chart_data.sun, moon: me.chart_data.moon, rising: me.chart_data.rising },
       partner: { sun: partnerChart.sun, moon: partnerChart.moon, rising: partnerChart.rising },
       score:   reading.score,
+      card_url: coupleCardUrl(req, reading.score, me.nickname, partner_name),  // การ์ดแชร์ได้ (ทุกคน รวม teaser)
     };
 
     if (active) {

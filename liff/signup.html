@@ -386,8 +386,25 @@
     }
   }
 
+  async function shareCouple(url) {
+    try {
+      if (liff.isApiAvailable && liff.isApiAvailable('shareTargetPicker')) {
+        await liff.shareTargetPicker([{ type: 'image', originalContentUrl: url, previewImageUrl: url }]);
+      } else {
+        alert('กดค้างที่รูปเพื่อบันทึก แล้วนำไปแชร์ได้เลยค่ะ 💜');
+      }
+    } catch (e) { /* ผู้ใช้ยกเลิก — ไม่ต้องทำอะไร */ }
+  }
+
   function renderCouple(d) {
     const pname = d.partner_name || 'คู่ของคุณ';
+    // การ์ดแชร์ได้ (โชว์เด่นบนสุด + ปุ่มแชร์เข้าแชทเพื่อน)
+    const card = d.card_url ? `
+      <div style="margin:2px 0 14px;">
+        <img src="${d.card_url}" alt="ดวงคู่" style="width:100%;border-radius:14px;display:block;box-shadow:0 6px 24px rgba(0,0,0,0.35);"/>
+        <button class="btn" style="margin-top:10px" onclick="shareCouple('${d.card_url}')">📤 แชร์การ์ดให้เพื่อน</button>
+        <div style="text-align:center;font-size:0.72rem;color:rgba(255,255,255,0.45);margin-top:6px;">หรือกดค้างที่รูปเพื่อบันทึกไปโพสต์ได้เลย</div>
+      </div>` : '';
     const head = `
       <div style="text-align:center;font-weight:700;color:#e8c4f7;margin-bottom:6px;">💞 คุณ × ${pname}</div>
       <div style="text-align:center;margin-bottom:10px;">
@@ -416,7 +433,7 @@
     } else {
       body = '<div style="padding:14px 0;text-align:center;color:rgba(255,255,255,0.7);font-size:0.9rem;">ดวงของคุณสองคนค่อนข้างเป็นกลาง ✨<br/>ไม่มีมุมเด่นพิเศษระหว่างกัน</div>';
     }
-    document.getElementById('couplebox').innerHTML = head + rows + body;
+    document.getElementById('couplebox').innerHTML = card + head + rows + body;
   }
 
   async function goToCoupleCheckout() {
