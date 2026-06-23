@@ -15,8 +15,10 @@ const OUT = path.join(__dirname, '..', 'marketing', 'art');
 fs.mkdirSync(OUT, { recursive: true });
 
 const FORMATS = {
-  feed:  { w: 896, h: 1216, suffix: '' },        // 4:5 — IG/FB feed + LINE
-  story: { w: 832, h: 1472, suffix: '-9x16' },   // 9:16 — Shorts/Stories/VOOM
+  feed:   { w: 896,  h: 1216, suffix: '' },        // 4:5 — IG/FB feed + LINE
+  story:  { w: 832,  h: 1472, suffix: '-9x16' },   // 9:16 — Shorts/Stories/VOOM
+  square: { w: 1080, h: 1080, suffix: '-1x1' },    // 1:1 — IG square + LINE rich message
+  wide:   { w: 1200, h: 628,  suffix: '-wide' },   // ~1.91:1 — LINE broadcast / FB link / web OG
 };
 
 // ภาพคีย์วิช่วล: ไม่มีตัวหนังสือ (Flux เขียนไทยไม่ได้) — ข้อความไทยค่อย composite ทับทีหลัง
@@ -24,7 +26,7 @@ const NEG = 'absolutely no text, no letters, no numbers, no inscriptions, no wri
 const CONCEPTS = {
   // A — "ดวงที่เป็นของคุณคนเดียว" : personalization-as-magic (วงจักรราศีสะอาด ไม่มีตัวหนังสือ)
   personal: {
-    num: 2,
+    num: 1,
     prompt: `A breathtaking premium mystical poster, vertical composition. Silhouette of a serene young Thai woman seen from behind, gazing up at a vast cosmic night sky. Above and around her glows a clean ornamental astrological wheel made of smooth concentric golden rings, delicate radiating constellation lines, small glowing celestial star and planet symbols and elegant sacred geometry — purely decorative ornament with smooth blank polished gold bands, no writing of any kind. Deep royal-purple and indigo nebula background with sparkling stardust, soft volumetric god rays. Ethereal, elegant, high-end astrology brand aesthetic, cinematic lighting, ultra detailed, dreamy, luxurious gold-and-purple palette. ${NEG}`,
   },
   // B — "ทักทุกเช้า" : daily morning ritual / warmth

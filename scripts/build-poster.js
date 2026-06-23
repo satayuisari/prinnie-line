@@ -17,8 +17,10 @@ fs.mkdirSync(OUT, { recursive: true });
 const FONT = "'Leelawadee UI','Tahoma','Noto Sans Thai',sans-serif";
 
 const FORMATS = {
-  feed:  { w: 896, h: 1216, art: '',      out: '' },        // 4:5 — IG/FB feed + LINE
-  story: { w: 832, h: 1472, art: '-9x16', out: '-9x16' },   // 9:16 — Shorts/Stories/VOOM
+  feed:   { w: 896,  h: 1216, art: '',      out: '' },        // 4:5 — IG/FB feed + LINE
+  story:  { w: 832,  h: 1472, art: '-9x16', out: '-9x16' },   // 9:16 — Shorts/Stories/VOOM
+  square: { w: 1080, h: 1080, art: '-1x1',  out: '-1x1' },    // 1:1 — IG square + LINE rich message
+  wide:   { w: 1200, h: 628,  art: '-wide', out: '-wide' },   // ~1.91:1 — LINE broadcast / FB link / web OG
 };
 
 // พาดหัว/ซับ/CTA ต่อคอนเซ็ปต์ — หลักการ: ขายความเป็นส่วนตัว ไม่พูดราคา
@@ -43,15 +45,20 @@ const POSTERS = {
 function esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 
 function buildSvg(p, W, H) {
-  const headSize = p.head.length > 1 ? 78 : 92;
-  const headLineH = headSize + 22;
-  const headStartY = 150;
+  const compact = H < 800;   // wide/landscape banner → ย่อข้อความให้พอดี
+  const multi = p.head.length > 1;
+  const headSize = compact ? (multi ? 54 : 66) : (multi ? 78 : 92);
+  const headLineH = headSize + (compact ? 12 : 22);
+  const headStartY = compact ? 96 : 150;
+  const subSize = compact ? 30 : 36;
+  const ctaSize = compact ? 30 : 34;
+  const pillH = compact ? 72 : 92;
   const headEls = p.head.map((line, i) =>
     `<text x="${W/2}" y="${headStartY + i*headLineH}">${esc(line)}</text>`).join('');
 
-  const pillW = Math.min(W - 70, 790), pillH = 92, pillX = (W - pillW)/2, pillY = H - 150;
-  const subY = pillY - 46;
-  const scrimH = 460;
+  const pillW = Math.min(W - 70, 790), pillX = (W - pillW)/2, pillY = H - (compact ? 110 : 150);
+  const subY = pillY - (compact ? 30 : 46);
+  const scrimH = compact ? Math.round(H * 0.55) : 460;
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"
        font-family="${FONT}">
@@ -80,12 +87,12 @@ function buildSvg(p, W, H) {
     </g>
     <rect x="${W/2-70}" y="${headStartY + p.head.length*headLineH - 30}" width="140" height="4" rx="2" fill="url(#gold)"/>
 
-    <text x="${W/2}" y="${subY}" text-anchor="middle" font-size="36" font-weight="500"
+    <text x="${W/2}" y="${subY}" text-anchor="middle" font-size="${subSize}" font-weight="500"
           fill="#f6ecd2" stroke="#0a0218" stroke-width="1.6" paint-order="stroke" stroke-linejoin="round">${esc(p.sub)}</text>
 
     <rect x="${pillX}" y="${pillY}" width="${pillW}" height="${pillH}" rx="${pillH/2}"
           fill="url(#gold)" stroke="#fff7e2" stroke-width="1.5"/>
-    <text x="${W/2}" y="${pillY + pillH/2 + 13}" text-anchor="middle" font-size="34" font-weight="700"
+    <text x="${W/2}" y="${pillY + pillH/2 + ctaSize*0.36}" text-anchor="middle" font-size="${ctaSize}" font-weight="700"
           fill="#2a1147">${esc(p.cta)}</text>
   </svg>`;
 }
