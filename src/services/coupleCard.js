@@ -3,8 +3,12 @@
 // ใช้พื้นหลังจาก marketing/art/concept-couple-1x1.png
 const fs   = require('fs');
 const path = require('path');
-const { Resvg } = require('@resvg/resvg-js');
-const sharp = require('sharp');
+// lazy-require: ไม่โหลด sharp/resvg ตอน boot (กัน server ล่มถ้า native module มีปัญหา) — โหลดตอน render ครั้งแรก
+let Resvg, sharp;
+function lazyDeps() {
+  if (!Resvg) Resvg = require('@resvg/resvg-js').Resvg;
+  if (!sharp) sharp = require('sharp');
+}
 
 const ROOT   = path.join(__dirname, '..', '..');
 const BG     = path.join(ROOT, 'marketing', 'art', 'concept-couple-1x1.png');
@@ -80,6 +84,7 @@ function buildSvg({ score, a, b }) {
 
 // คืน Buffer ของ JPEG การ์ด
 async function render(opts) {
+  lazyDeps();
   const overlay = new Resvg(Buffer.from(buildSvg(opts)),
     { fitTo: { mode: 'width', value: W }, font: { fontFiles: FONTS, loadSystemFonts: false, defaultFontFamily: 'Sarabun' } }
   ).render().asPng();
