@@ -118,7 +118,40 @@ async function transitReading(chart, date, planetFilter, limit = 3) {
   return readings;
 }
 
-// ไพ่ตามช่วง (free/weekly/monthly/annual)
+// ===== ไพ่อัจฉริยะตามดวงดาว =====
+// วันนี้ดาวเด่นไปทางไหน → ดึงไพ่หมวดนั้น (การงาน/การเงิน/ความรัก)
+// เรามีไพ่แยกหมวดใน horoscope_tarot.type: work / money / love (นอกจาก free/weekly/monthly/annual)
+// แต่ละดาวมี "พลังประจำตัว" → รวมคะแนนจากดาวที่ทำมุมวันนี้ แล้วเลือกหมวดที่แรงสุด
+const PLANET_THEME = {
+  Venus:   { love: 1.0, money: 0.5 },   // ศุกร์ = ความรัก/เสน่ห์/เงินทอง
+  Moon:    { love: 0.6 },               // จันทร์ = อารมณ์/ความสัมพันธ์
+  Mars:    { work: 1.0 },               // อังคาร = แรงผลักดัน/การงาน
+  Mercury: { work: 0.8, money: 0.3 },   // พุธ = การสื่อสาร/ค้าขาย
+  Jupiter: { money: 1.0, work: 0.3 },   // พฤหัส = โชคลาภ/การเงิน
+  Saturn:  { work: 0.8, money: 0.3 },   // เสาร์ = ความรับผิดชอบ/หน้าที่
+  // Sun + ดาวนอก (Neptune/Pluto) = ภาพรวม ไม่ผูกหมวด → ไพ่ทั่วไป
+};
+const HARMONIOUS = new Set(['Trine', 'Sextile', 'Conjunction']);   // มุมดี = เน้นหมวดนั้นชัดขึ้น
+const THEME_TH = { love: 'ความรัก', money: 'การเงิน', work: 'การงาน' };
+const THEME_EMOJI = { love: '💖', money: '💰', work: '💼' };
+
+// ชั่งคะแนนหมวดจากชุดมุมดาววันนี้ → คืนหมวดเด่น ('love'|'money'|'work') หรือ null (ไม่เด่น = ไพ่ทั่วไป)
+function classifyDayTheme(aspects) {
+  const score = { love: 0, money: 0, work: 0 };
+  for (const a of aspects) {
+    const qual = HARMONIOUS.has(a.aspect) ? 1.3 : 1.0;   // มุมดี → ดึงไพ่หมวดนั้นแน่นขึ้น
+    const ex   = 1 + (a.exactness || 0);                  // มุมยิ่งแม่น (exactness สูง) ยิ่งมีน้ำหนัก
+    for (const p of [a.aspecting_planet, a.aspected_planet]) {
+      const themes = PLANET_THEME[p];
+      if (!themes) continue;
+      for (const t in themes) score[t] += themes[t] * qual * ex;
+    }
+  }
+  const top = Object.keys(score).sort((x, y) => score[y] - score[x])[0];
+  return top && score[top] >= 1.0 ? top : null;          // ต่ำกว่าเกณฑ์ = ไม่มีหมวดเด่น
+}
+
+// ไพ่ตามช่วง/หมวด (free/weekly/monthly/annual/work/money/love)
 async function tarotByType(type) {
   const r = await db.query(
     `SELECT h.description, t.name, t.image_id
@@ -147,7 +180,15 @@ function aspectSig(aspects) {
 // ===== ดวงรายวัน = ดาวเร็วทำมุมวันนี้ + ไพ่ =====
 async function dailyReading(chart, date = new Date()) {
   const aspects = await transitReading(chart, date, DAILY_PLANETS, 3);
-  const tarot   = await tarotByType('free');
+
+  // 🃏 ไพ่ฉลาด: ดูว่าดาวที่ทำมุมวันนี้เอนไปทางใด (การงาน/การเงิน/ความรัก) → ดึงไพ่หมวดนั้น
+  // ใช้ "มุมทั้งหมด" ของดาวรายวัน (ไม่กรองเฉพาะที่มีคำทำนาย) เพื่อจับธีมจริงของท้องฟ้า
+  const transiting = transitingPositions(date);
+  const rawDaily   = transitAspects(transiting, chart.planets)
+    .filter(a => DAILY_PLANETS.includes(a.aspecting_planet));
+  const theme = classifyDayTheme(rawDaily);
+  const tarot = await tarotByType(theme || 'free') || await tarotByType('free');
+  if (tarot) tarot.theme = theme;   // ให้ formatter ติดป้าย "ไพ่การเงินประจำวัน" ฯลฯ
 
   // กันดวงซ้ำ: อาทิตย์เคลื่อนช้า (~1°/วัน) มุมค้างได้หลายวัน
   // ถ้าชุดมุมวันนี้เหมือนเมื่อวานเป๊ะ → ถือว่า "ดวงนิ่ง" ไม่ส่งคำทำนายซ้ำ ส่งไพ่อย่างเดียว
@@ -164,9 +205,17 @@ async function dailyReading(chart, date = new Date()) {
     date: date.toISOString().slice(0, 10),
     aspects: shown,
     tarot,
+    theme,
     calm,
     has_content: shown.length > 0,
   };
+}
+
+// ป้ายชื่อไพ่ตามหมวดของวัน — "🃏 ไพ่การเงินประจำวัน: ..." (default = ไพ่ประจำวัน)
+function tarotHeading(theme) {
+  return theme
+    ? `${THEME_EMOJI[theme]} ไพ่${THEME_TH[theme]}ประจำวัน`
+    : '🃏 ไพ่ประจำวัน';
 }
 
 // ===== รายสัปดาห์/เดือน/ปี = ดาวจร (ตามชุดความเร็ว) + ไพ่ประจำช่วง =====
@@ -182,4 +231,7 @@ async function periodReading(period, chart, date = new Date()) {
   return { period, aspects, tarot, has_content: aspects.length > 0 || !!tarot };
 }
 
-module.exports = { natalReading, dailyReading, periodReading, tarotByType, stripHtml, aspectBlocks };
+module.exports = {
+  natalReading, dailyReading, periodReading, tarotByType,
+  stripHtml, aspectBlocks, classifyDayTheme, tarotHeading, THEME_TH,
+};

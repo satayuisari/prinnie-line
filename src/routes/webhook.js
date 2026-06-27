@@ -51,7 +51,11 @@ function formatReading(reading, title, nickname) {
     lines.push('🌙 ช่วงนี้ดวงดาวของคุณนิ่งสงบ ไม่มีมุมเด่นพิเศษ',
                'เป็นวันสบาย ๆ ขอให้ไพ่ใบนี้นำทางคุณนะคะ ✨', '');
   }
-  if (reading.tarot) lines.push('🃏 ' + reading.tarot.name, reading.tarot.text);
+  if (reading.tarot) {
+    // ดวงรายวันติดป้ายหมวด (ไพ่การเงิน/ความรัก/การงาน) ตามดวงดาว — รายสัปดาห์/เดือน/ปี ใช้หัวธรรมดา
+    const head = reading.theme ? horoscope.tarotHeading(reading.theme) : '🃏 ' + reading.tarot.name;
+    lines.push(reading.theme ? `${head}: ${reading.tarot.name}` : head, reading.tarot.text);
+  }
   return lines.join('\n').trim();
 }
 

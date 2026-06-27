@@ -58,11 +58,13 @@ async function runNudges(now = new Date()) {
     return { sent: 0, candidates: 0, disabled: true };
   }
 
-  // เป้า: กรอกดวงแล้ว (มี chart) + ยังไม่ active (ยังไม่จ่าย/หมดอายุ) + ยังไม่ครบทุก stage
+  // เป้า: กรอกดวงแล้ว (มี chart) + ยัง "ไม่เคยจ่าย" + ยังไม่ครบทุก stage
+  // คนที่เคยจ่ายแล้วหมดอายุ = งานของ renewals.js (กันยิงซ้อนกัน) → กรอง payment_ref IS NULL
   const { rows } = await db.query(
     `SELECT id, line_user_id, nickname, chart_data, COALESCE(nudge_stage,0) AS nudge_stage, created_at
        FROM line_subscribers
       WHERE chart_data IS NOT NULL
+        AND payment_ref IS NULL
         AND (subscribe_end IS NULL OR subscribe_end <= NOW())
         AND COALESCE(nudge_stage,0) < $1
       ORDER BY id`,

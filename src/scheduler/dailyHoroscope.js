@@ -27,7 +27,7 @@ function formatMessage(reading, nickname) {
   }
 
   if (reading.tarot) {
-    lines.push(`🃏 ไพ่ประจำวัน: ${reading.tarot.name}`, reading.tarot.text);
+    lines.push(`${horoscope.tarotHeading(reading.theme)}: ${reading.tarot.name}`, reading.tarot.text);
   }
 
   return lines.join('\n').trim();

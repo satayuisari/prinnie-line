@@ -4,7 +4,8 @@ const subscribers = require('../services/subscriberService');
 const horoscope   = require('../services/horoscopeService');
 const synastry    = require('../services/synastryService');
 const geocoding   = require('../services/geocodingService');
-const stripeService = require('../services/stripeService');
+const beamService = require('../services/beamService');
+const orders      = require('../services/paymentOrders');
 const coupleCard  = require('../services/coupleCard');
 const { computeNatalChart } = require('../astro/natalChart');
 const { requireAuth } = require('../services/lineAuth');
@@ -134,29 +135,29 @@ router.post('/synastry', requireAuth, async (req, res) => {
   }
 });
 
-// POST /api/line/couple-checkout — สร้างหน้าจ่าย 149 ปลดล็อกดวงคู่ (คนไม่ใช่สมาชิก)
+// ปลดล็อกดวงคู่ 149 (ครั้งเดียว) → Beam payment link. เก็บข้อมูลคู่ใน payment_orders
+// (Beam ไม่ส่ง metadata กลับเหมือน Stripe → webhook lookup จาก ref). ถ้ายังไม่ตั้ง Beam → 410
 router.post('/couple-checkout', requireAuth, async (req, res) => {
+  if (!beamService.isEnabled()) {
+    return res.status(410).json({
+      disabled: true,
+      error: 'ช่องทางชำระเงินกำลังปรับปรุง โปรดติดต่อทีมงานสักครู่นะคะ ✨',
+    });
+  }
   const { partner_name, birth_date, birth_time, birth_place, lat, lng } = req.body;
   if (!birth_date) return res.status(400).json({ error: 'ต้องส่งวันเกิดของคู่' });
   try {
-    const me = await subscribers.getByLineUserId(req.line.userId);
-    if (!me || !me.chart_data) return res.status(404).json({ error: 'คุณยังไม่มีข้อมูลดวง' });
-
-    // geocode ให้ได้ lat/lng เก็บใน metadata → webhook ไม่ต้อง geocode ซ้ำ (ผลคงที่)
-    let plat = lat != null ? Number(lat) : null;
-    let plng = lng != null ? Number(lng) : null;
-    if ((plat == null || plng == null) && birth_place) {
-      const g = await geocoding.geocode(birth_place);
-      plat = g.lat; plng = g.lng;
-    }
-
-    const url = await stripeService.createCoupleCheckout(req.line.userId, {
-      partner_name, birth_date, birth_time, birth_place, lat: plat, lng: plng,
+    const ref = await orders.create({
+      type: 'couple',
+      line_user_id: req.line.userId,
+      amount: beamService.COUPLE_PRICE_THB * 100,
+      payload: { partner_name, birth_date, birth_time, birth_place, lat, lng },
     });
+    const { url } = await beamService.createCoupleLink(ref, partner_name);
     res.json({ url });
   } catch (err) {
     console.error('[couple-checkout]', err.message);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'สร้างหน้าจ่ายเงินไม่สำเร็จ ลองใหม่อีกครั้งนะคะ' });
   }
 });
 

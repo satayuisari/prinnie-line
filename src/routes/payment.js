@@ -1,43 +1,32 @@
-const express       = require('express');
-const router        = express.Router();
-const subscribers   = require('../services/subscriberService');
-const lineMessaging = require('../services/lineMessaging');
-const stripeService = require('../services/stripeService');
+const express     = require('express');
+const router      = express.Router();
+const beamService = require('../services/beamService');
+const orders      = require('../services/paymentOrders');
 const { requireAuth } = require('../services/lineAuth');
 
-// POST /api/payment/create-checkout — สร้างหน้าจ่ายเงิน Stripe (userId จาก token)
+// สมัครสมาชิกรายเดือน 399 → สร้าง Beam payment link (PromptPay/บัตร/LINE Pay)
+// ย้ายจาก Stripe (2026-06-27): Stripe TH ไม่รับธุรกิจดูดวง/โหราศาสตร์
+// ถ้ายังไม่ตั้งค่า Beam → คง 410 "กำลังปรับปรุง" (กันสร้างลิงก์เสีย)
+const PAYMENT_DISABLED = {
+  disabled: true,
+  error: 'ช่องทางชำระเงินกำลังปรับปรุง โปรดติดต่อทีมงานสักครู่นะคะ ✨',
+};
 router.post('/create-checkout', requireAuth, async (req, res) => {
+  if (!beamService.isEnabled()) return res.status(410).json(PAYMENT_DISABLED);
   try {
-    const url = await stripeService.createCheckout(req.line.userId);
+    const ref = await orders.create({
+      type: 'subscription',
+      line_user_id: req.line.userId,
+      amount: beamService.PRICE_THB * 100,
+    });
+    const { url } = await beamService.createSubscriptionLink(ref);
     res.json({ url });
   } catch (err) {
-    console.error('[create-checkout]', err.message);
-    res.status(500).json({ error: err.message });
+    console.error('[payment] create-checkout:', err.message);
+    res.status(500).json({ error: 'สร้างหน้าจ่ายเงินไม่สำเร็จ ลองใหม่อีกครั้งนะคะ' });
   }
 });
 
-// POST /api/payment/webhook
-// Payment gateway เรียกเมื่อจ่ายสำเร็จ → activate +30 วัน
-router.post('/webhook', async (req, res) => {
-  res.json({ received: true }); // ตอบทันที กัน gateway retry
-
-  const { line_user_id, payment_ref, status } = req.body;
-  if (status !== 'SUCCESS') return;
-
-  try {
-    const result = await subscribers.activateSubscription(line_user_id, payment_ref, 30);
-
-    const expireTH = new Date(result.expire_date).toLocaleDateString('th-TH', {
-      year: 'numeric', month: 'long', day: 'numeric',
-    });
-    await lineMessaging.pushText(
-      line_user_id,
-      `ยินดีต้อนรับสู่ Prinnie333! ✨\n\nสมาชิกภาพของคุณเริ่มแล้ว\nสิ้นสุด: ${expireTH}\n\nคุณจะได้รับดวงประจำวันทุกเช้า 08:00 น. 🌟`
-    );
-    console.log(`[payment] activated ${line_user_id} until ${result.expire_date}`);
-  } catch (err) {
-    console.error('[payment] webhook error:', err.message);
-  }
-});
-
+// หมายเหตุ: webhook การชำระเงินอยู่ที่ src/routes/beamWebhook.js (ตรวจลายเซ็น + ยืนยันกับ Beam)
+// เดิมมี POST /api/payment/webhook ที่ activate จาก body ตรง ๆ ไม่ตรวจอะไร — ลบทิ้ง (ช่องโหว่)
 module.exports = router;

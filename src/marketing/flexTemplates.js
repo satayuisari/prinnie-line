@@ -116,6 +116,63 @@ function earlyBirdEnding(liffUrl, deadlineText) {
   }));
 }
 
+// ─── เตือนต่ออายุ (กัน churn) — ใช้กับสมาชิกที่เคยจ่ายแล้วใกล้/เลยวันหมดอายุ ───
+
+// 5) ก่อนหมดอายุ (T-3..T-1) — เตือนล่วงหน้า ดวงรายวันกำลังจะหยุด
+function renewalSoon(liffUrl, daysLeft, expireText) {
+  const dayWord = daysLeft <= 1 ? 'พรุ่งนี้' : `อีก ${daysLeft} วัน`;
+  return msg(`สมาชิกของคุณใกล้หมดอายุ (${dayWord})`, bubble({
+    kicker: 'ต่ออายุสมาชิก',
+    title: `ดวงรายวันส่วนตัวจะหยุดส่ง${daysLeft <= 1 ? 'เร็ว ๆ นี้' : `ใน ${daysLeft} วัน`} ⏳`,
+    lines: [
+      `สมาชิก Prinnie333 ของคุณจะหมดอายุ ${expireText}`,
+      'ต่ออายุไว้ เพื่อรับดวงส่วนตัวส่งถึงคุณทุกเช้าต่อเนื่อง',
+      '---',
+      '☀️ ดวงรายวันส่วนตัวจากดวงเกิดจริงของคุณ',
+      '+ ดวงสัปดาห์/เดือน/ปี + ไพ่ + ผูกดวงคู่ไม่จำกัด',
+    ],
+    buttonLabel: '✨ ต่ออายุสมาชิก',
+    buttonUri: liffUrl,
+    note: 'ต่ออายุก่อนหมด ดวงเช้าไม่สะดุดค่ะ 💜',
+  }));
+}
+
+// 6) วันหมดอายุ (T-0..T+1) — แจ้งว่าหมดแล้ว ดวงหยุดส่ง
+function renewalExpired(liffUrl) {
+  return msg('สมาชิกของคุณหมดอายุแล้ว', bubble({
+    kicker: 'สมาชิกหมดอายุ',
+    title: 'ดวงรายวันส่วนตัวหยุดส่งแล้ววันนี้ 🌙',
+    lines: [
+      'สมาชิก Prinnie333 ของคุณหมดอายุแล้ว ดวงเช้าจึงพักไว้ก่อน',
+      'ต่ออายุเมื่อไหร่ ดวงส่วนตัวพร้อมส่งถึงคุณทุกเช้าทันที',
+      '---',
+      '☀️ ดวงรายวันเฉพาะคุณ ทุกเช้า 08:00 น.',
+      '🔒 สมาชิกรุ่นก่อตั้ง ราคาเดิม 399 บาท/เดือน',
+    ],
+    buttonLabel: '✨ ต่ออายุรับดวงต่อ',
+    buttonUri: liffUrl,
+    note: 'คิดถึงดวงเช้า ๆ ของคุณนะคะ 💜',
+  }));
+}
+
+// 7) win-back (T+3) — ดึงกลับครั้งสุดท้ายของรอบ
+function renewalWinback(liffUrl) {
+  return msg('กลับมารับดวงเช้าของคุณอีกครั้งไหม', bubble({
+    kicker: 'คิดถึงคุณ 💜',
+    title: 'ดวงดาวยังขยับ... รอส่งถึงคุณอยู่ ✨',
+    lines: [
+      'ผ่านมาหลายเช้าแล้วที่ดวงส่วนตัวของคุณพักไว้',
+      'ทุกวันดวงดาวเคลื่อนทำมุมกับดวงเกิดของคุณไม่ซ้ำกัน',
+      '---',
+      'กลับมาเป็นสมาชิก รับดวงรายวันเฉพาะคุณส่งทุกเช้า',
+      'เพียง 399 บาท/เดือน + ผูกดวงคู่ไม่จำกัด',
+    ],
+    buttonLabel: '💜 กลับมารับดวงต่อ',
+    buttonUri: liffUrl,
+    note: 'ดวงเกิดของคุณยังอยู่ครบ กลับมาเมื่อไหร่ก็ส่งต่อได้เลยค่ะ',
+  }));
+}
+
 // 0) Welcome ตอนแอดเพื่อน — ขาย subscription (2 ปุ่ม: เริ่มฟรี / สมัครรายเดือน)
 function welcomeCard(liffUrl) {
   return msg('🔮 ยินดีต้อนรับสู่ Prinnie333 — รับพื้นดวงฟรี', {
@@ -152,4 +209,7 @@ function welcomeCard(liffUrl) {
   });
 }
 
-module.exports = { welcomeCard, launchOffer, upsellSubscribe, coupleTeaser, earlyBirdEnding };
+module.exports = {
+  welcomeCard, launchOffer, upsellSubscribe, coupleTeaser, earlyBirdEnding,
+  renewalSoon, renewalExpired, renewalWinback,
+};

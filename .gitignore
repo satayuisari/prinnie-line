@@ -4,6 +4,7 @@ richmenu/.richmenu-id
 *.log
 
 .pglite-data/
+scratchpad/
 
 tools/
 _skill_inspect/
