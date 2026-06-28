@@ -13,7 +13,11 @@ async function getStats() {
   const s = (await db.query(`
     SELECT
       COUNT(*)::int AS total,
+      COUNT(*) FILTER (WHERE chart_data IS NOT NULL)::int AS registered,
+      COUNT(*) FILTER (WHERE chart_data IS NOT NULL AND status='PENDING')::int AS pending_reg,
       COUNT(*) FILTER (WHERE status='ACTIVE')::int    AS active,
+      COUNT(*) FILTER (WHERE status='ACTIVE' AND payment_ref IS NOT NULL
+                        AND payment_ref NOT IN ('tester','free-trial','free'))::int AS paying,
       COUNT(*) FILTER (WHERE status='PENDING')::int   AS pending,
       COUNT(*) FILTER (WHERE status='EXPIRED')::int   AS expired,
       COUNT(*) FILTER (WHERE status='CANCELLED')::int AS cancelled,
@@ -53,8 +57,10 @@ function inboxCard(m, aiOn, key) {
 }
 
 function render({ s, recent }, msgs, aiOn, key) {
-  const mrr = (s.active * PRICE).toLocaleString();
-  const conv = (s.active + s.pending) ? Math.round(s.active / (s.active + s.pending) * 100) : 0;
+  const mrr = (s.paying * PRICE).toLocaleString();   // นับเฉพาะลูกค้าจ่ายจริง (ตัด tester/free/admin)
+  // funnel: ผู้ติดตาม → ลงทะเบียนดวง → สมาชิกจ่ายเงิน
+  const regRate = s.total ? Math.round(s.registered / s.total * 100) : 0;       // แอด → ลงทะเบียน (จุดที่อุด 966→14)
+  const payRate = s.registered ? Math.round(s.active / s.registered * 100) : 0; // ลงทะเบียน → จ่าย
   const badge = st => ({ ACTIVE:'#1faa59', PENDING:'#C98A00', EXPIRED:'#8a8a8a', CANCELLED:'#b94646' }[st] || '#888');
   const rows = recent.map(r => `<tr><td>${esc(r.display_name || r.nickname || '(ไม่มีชื่อ)')}</td>
     <td><span class="pill" style="background:${badge(r.status)}">${r.status}</span></td>
@@ -102,13 +108,18 @@ function render({ s, recent }, msgs, aiOn, key) {
   </div>
 
   <div class="pane on" id="p-sub">
+    <div class="sec" style="margin-top:0">🫙 Funnel — ผู้ติดตาม → ลงทะเบียน → จ่าย</div>
     <div class="grid">
-      ${card('💚 สมาชิก (ACTIVE)', s.active, 'มี monthly access', '#5CE6A1')}
-      ${card('💰 MRR', '฿' + mrr, `${s.active} × ฿${PRICE}`, 'var(--gold)')}
-      ${card('👥 ทั้งหมด', s.total, `conversion ${conv}%`)}
-      ${card('⏳ รอจ่าย', s.pending, 'ยังไม่จ่าย', '#F0C868')}
-      ${card('🆕 วันนี้', s.today)}
-      ${card('📅 สัปดาห์นี้', s.this_week)}
+      ${card('👥 ผู้ติดตาม (บันทึก)', s.total, 'นับตั้งแต่เปิด track')}
+      ${card('📝 ลงทะเบียนดวง', s.registered, `${regRate}% ของผู้ติดตาม`, '#7FD8E8')}
+      ${card('💚 สมาชิก (ACTIVE)', s.active, `${payRate}% ของผู้ลงทะเบียน`, '#5CE6A1')}
+      ${card('💰 MRR', '฿' + mrr, `${s.paying} จ่ายจริง × ฿${PRICE}`, 'var(--gold)')}
+    </div>
+    <div class="sec">รายละเอียด</div>
+    <div class="grid">
+      ${card('⏳ ลงทะเบียนแล้ว รอจ่าย', s.pending_reg, 'มีดวงแล้ว ยังไม่สมัคร', '#F0C868')}
+      ${card('🆕 แอดวันนี้', s.today)}
+      ${card('📅 แอดสัปดาห์นี้', s.this_week)}
       ${card('⚠️ ใกล้หมด (7วัน)', s.expiring_soon, '', s.expiring_soon ? '#F0A868' : undefined)}
       ${card('🗂️ EXPIRED/ยกเลิก', s.expired + s.cancelled, `EXP ${s.expired}·CAN ${s.cancelled}`)}
     </div>

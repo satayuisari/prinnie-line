@@ -78,6 +78,18 @@ async function upsertSubscriber(input) {
   };
 }
 
+// บันทึก "lead" ตอนมีคนแอดเพื่อน (follow) — เก็บ userId ไว้วัด funnel + ตามกลับภายหลัง
+// chart_data ยัง NULL = ยังไม่ลงทะเบียน. ON CONFLICT DO NOTHING = ไม่ทับข้อมูลคนที่ลงทะเบียน/จ่ายแล้ว
+async function captureFollower({ line_user_id, display_name, picture_url }) {
+  if (!line_user_id) return;
+  await db.query(
+    `INSERT INTO line_subscribers (line_user_id, display_name, picture_url, status, created_at, updated_at)
+     VALUES ($1, $2, $3, 'PENDING', NOW(), NOW())
+     ON CONFLICT (line_user_id) DO NOTHING`,
+    [line_user_id, display_name || null, picture_url || null]
+  );
+}
+
 async function getByLineUserId(line_user_id) {
   const r = await db.query(
     'SELECT * FROM line_subscribers WHERE line_user_id = $1', [line_user_id]
@@ -152,5 +164,5 @@ async function getActiveSubscribers() {
 
 module.exports = {
   upsertSubscriber, getByLineUserId, getMemberStatus,
-  activateSubscription, getActiveSubscribers,
+  activateSubscription, getActiveSubscribers, captureFollower,
 };

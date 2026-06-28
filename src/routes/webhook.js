@@ -110,6 +110,16 @@ async function handleEvent(event) {
 
   // follow = เพิ่งกด add (หรือ unblock)
   if (event.type === 'follow') {
+    // เก็บ lead ไว้วัด funnel + ตามกลับ (ไม่ทับคนที่ลงทะเบียน/จ่ายแล้ว) — non-blocking
+    const uid = event.source && event.source.userId;
+    if (uid) {
+      const p = await client.getProfile(uid).catch(() => null);
+      await subscribers.captureFollower({
+        line_user_id: uid,
+        display_name: p && p.displayName,
+        picture_url:  p && p.pictureUrl,
+      }).catch(e => console.error('[follow] captureFollower:', e.message));
+    }
     return replyMessage(event.replyToken, flex.welcomeCard(LIFF_URL));
   }
 

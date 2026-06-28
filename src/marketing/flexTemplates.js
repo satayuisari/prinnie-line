@@ -173,26 +173,28 @@ function renewalWinback(liffUrl) {
   }));
 }
 
-// 0) Welcome ตอนแอดเพื่อน — ขาย subscription (2 ปุ่ม: เริ่มฟรี / สมัครรายเดือน)
+// 0) Welcome ตอนแอดเพื่อน — นำด้วย "ฟรี" ล้วน (ปุ่มเดียว) เพื่อดันให้คนกรอกวันเกิด
+// ไม่โชว์ราคา/ปุ่มสมัครตรงนี้ — upsell 399 ไปเกิดหลังเขาเห็นดวงฟรีของตัวเองแล้ว (แปลงดีกว่า)
 function welcomeCard(liffUrl) {
-  return msg('🔮 ยินดีต้อนรับสู่ Prinnie333 — รับพื้นดวงฟรี', {
+  return msg('🎁 รับพื้นดวงส่วนตัวฟรี — รู้จักดวงจันทร์/ลัคนาของคุณ', {
     type: 'bubble',
     header: {
       type: 'box', layout: 'vertical', backgroundColor: PURPLE, paddingAll: '20px',
       contents: [
-        { type: 'text', text: 'PRINNIE333', color: GOLD, size: 'xs', weight: 'bold' },
-        { type: 'text', text: 'ดวงส่วนตัวรายวัน 🌙', color: '#FFFFFF', size: 'xl', weight: 'bold', wrap: true, margin: 'sm' },
+        { type: 'text', text: 'PRINNIE333 · ยินดีต้อนรับ', color: GOLD, size: 'xs', weight: 'bold' },
+        { type: 'text', text: 'ดวงจันทร์คุณ อยู่ราศีไหน? 🌙', color: '#FFFFFF', size: 'xl', weight: 'bold', wrap: true, margin: 'sm' },
       ],
     },
     body: {
       type: 'box', layout: 'vertical', paddingAll: '18px', spacing: 'sm', backgroundColor: '#FBF8FF',
       contents: [
-        { type: 'text', text: 'ดวงเฉพาะคุณ คำนวณจากวันเกิด เวลา สถานที่จริง — ไม่ใช่ดวง 12 ราศีทั่วไป', size: 'sm', color: INK, wrap: true },
+        { type: 'text', text: 'กรอกแค่ “วันเกิด” แล้วรับ พื้นดวงส่วนตัว ฟรีทันที 🎁', size: 'sm', color: INK, weight: 'bold', wrap: true },
+        { type: 'text', text: 'คำนวณจากวันเกิดจริงของคุณ ไม่ใช่ดวง 12 ราศีทั่วไปที่ใครก็อ่านได้', size: 'sm', color: INK, wrap: true },
         { type: 'separator', margin: 'md', color: '#E7DCF5' },
         { type: 'box', layout: 'vertical', margin: 'md', spacing: 'sm', contents: [
-          { type: 'text', text: '☀️  ดวงรายวันเฉพาะคุณ ส่งทุกเช้า', size: 'sm', color: INK, wrap: true },
-          { type: 'text', text: '🌙  พื้นดวง (อาทิตย์/จันทร์/ลัคนา)', size: 'sm', color: INK, wrap: true },
-          { type: 'text', text: '🃏  ไพ่ทาโรต์   ·   💞  ผูกดวงคู่', size: 'sm', color: INK, wrap: true },
+          { type: 'text', text: '☀️  อาทิตย์ — ตัวตนของคุณ', size: 'sm', color: INK, wrap: true },
+          { type: 'text', text: '🌙  จันทร์ — อารมณ์ลึก ๆ ของคุณ', size: 'sm', color: INK, wrap: true },
+          { type: 'text', text: '⬆️  ลัคนา  ·  🔢  เลขชีวิต', size: 'sm', color: INK, wrap: true },
         ] },
       ],
     },
@@ -200,10 +202,8 @@ function welcomeCard(liffUrl) {
       type: 'box', layout: 'vertical', paddingAll: '16px', spacing: 'sm', backgroundColor: '#FBF8FF',
       contents: [
         { type: 'button', style: 'primary', color: GOLD, height: 'sm',
-          action: { type: 'uri', label: '🎁 เริ่มฟรี · กรอกวันเกิด', uri: liffUrl } },
-        { type: 'button', style: 'secondary', height: 'sm',
-          action: { type: 'uri', label: '☀️ สมัครรับดวงรายวัน 399.-', uri: liffUrl } },
-        { type: 'text', text: 'รับพื้นดวงฟรีก่อน แล้วสมัครรับดวงรายวันต่อได้เลย 💜', size: 'xxs', color: PURPLE_SOFT, align: 'center', wrap: true, margin: 'sm' },
+          action: { type: 'uri', label: '🎁 รับพื้นดวงฟรี (30 วินาที)', uri: liffUrl } },
+        { type: 'text', text: 'ฟรี ไม่มีค่าใช้จ่าย · กรอกแค่วันเกิดก็ดูได้เลย 💜', size: 'xxs', color: PURPLE_SOFT, align: 'center', wrap: true, margin: 'sm' },
       ],
     },
   });
