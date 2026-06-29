@@ -3,14 +3,31 @@ const { transitingPositions } = require('../astro/natalChart');
 const { transitAspects } = require('../astro/aspects');
 
 // content เก็บเป็น HTML (Quill) — แปลงเป็น plain text สำหรับ LINE
+// Quill ใส่ typographic entities (&ldquo; &rdquo; &hellip; ฯลฯ) — LINE ไม่ render HTML
+// ต้อง decode เป็นตัวอักษรจริง ไม่งั้นโชว์ดิบ
+const NAMED_ENTITIES = {
+  nbsp: ' ', ldquo: '“', rdquo: '”', lsquo: '‘', rsquo: '’',
+  hellip: '…', mdash: '—', ndash: '–', quot: '"', apos: "'",
+  lt: '<', gt: '>', laquo: '«', raquo: '»', deg: '°',
+};
+function decodeEntities(s) {
+  return s
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(parseInt(d, 10)))
+    .replace(/&([a-z]+);/gi, (m, name) => {
+      const k = NAMED_ENTITIES[name.toLowerCase()];
+      return k !== undefined ? k : m;
+    })
+    .replace(/&amp;/g, '&'); // decode สุดท้าย กัน double-decode
+}
 function stripHtml(html) {
   if (!html) return '';
-  return html
-    .replace(/<\/p>/gi, '\n')
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
+  return decodeEntities(
+    html
+      .replace(/<\/p>/gi, '\n')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<[^>]+>/g, '')
+  )
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
