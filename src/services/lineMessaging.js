@@ -4,6 +4,24 @@ const client = new line.messagingApi.MessagingApiClient({
   channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
 });
 
+// blob client = ดึง "เนื้อหา" ของข้อความ (รูป/ไฟล์) เช่น รูปสลิปโอนเงินที่ลูกค้าส่งมา
+const blobClient = new line.messagingApi.MessagingApiBlobClient({
+  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
+});
+
+// ดึงรูปจาก messageId → Buffer (ใช้แสดงสลิปบน dashboard). คืน null ถ้าดึงไม่ได้/หมดอายุ
+async function getMessageContent(messageId) {
+  try {
+    const stream = await blobClient.getMessageContent(messageId);
+    const chunks = [];
+    for await (const chunk of stream) chunks.push(chunk);
+    return Buffer.concat(chunks);
+  } catch (e) {
+    console.error('[line] getMessageContent:', e.message);
+    return null;
+  }
+}
+
 // ════════ SAFETY NET ════════
 // TEST_MODE=true → ส่งข้อความได้เฉพาะ userId ใน TEST_USER_IDS เท่านั้น
 // กันพลาดส่งหา 10,000 followers ตอนทดสอบบน OA จริง
@@ -49,4 +67,4 @@ async function broadcast(messages) {
   });
 }
 
-module.exports = { client, pushMessage, pushText, replyMessage, broadcast, isAllowed, TEST_MODE };
+module.exports = { client, blobClient, getMessageContent, pushMessage, pushText, replyMessage, broadcast, isAllowed, TEST_MODE };

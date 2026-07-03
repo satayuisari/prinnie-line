@@ -6,6 +6,7 @@ const flex         = require('../marketing/flexTemplates');
 const supportInbox = require('../services/supportInbox');
 const supportAI    = require('../services/supportAI');
 const triage       = require('../services/supportTriage');
+const paymentOrders = require('../services/paymentOrders');
 
 async function lineClient_safeProfile(userId) {
   try { const p = await client.getProfile(userId); return p && p.displayName; }
@@ -121,6 +122,17 @@ async function handleEvent(event) {
       }).catch(e => console.error('[follow] captureFollower:', e.message));
     }
     return replyMessage(event.replyToken, flex.welcomeCard(LIFF_URL));
+  }
+
+  // รูปภาพ = น่าจะเป็นสลิปโอนเงิน → ผูกกับออเดอร์ PromptPay ที่ค้างอยู่ของ user นี้
+  // มีออเดอร์ค้าง → ตอบรับสลิป (staff อนุมัติบน dashboard). ไม่มี → รูปทั่วไป เงียบไว้ให้ staff ดูแล
+  if (event.type === 'message' && event.message.type === 'image') {
+    const order = await paymentOrders.attachSlip(event.source.userId, event.message.id).catch(() => null);
+    if (order) {
+      return replyMessage(event.replyToken, { type: 'text', text:
+        'ได้รับสลิปแล้วค่ะ ✨\nทีมงานกำลังตรวจสอบการชำระเงิน จะเปิดใช้งานสมาชิกให้ภายใน 24 ชม. แล้วแจ้งกลับนะคะ 🙏' });
+    }
+    return;
   }
 
   // ปุ่ม rich menu ส่ง postback / ข้อความพิมพ์ → เดาเจตนา

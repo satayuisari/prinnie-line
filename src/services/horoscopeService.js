@@ -28,6 +28,10 @@ function stripHtml(html) {
       .replace(/<br\s*\/?>/gi, '\n')
       .replace(/<[^>]+>/g, '')
   )
+    // ซ่อมสระอำที่ถูกแยกส่วน: นิคหิต ◌ํ(U+0E4D) + สระอา า(U+0E32) → ำ(U+0E33)
+    // content จาก editor เก่าเก็บ "นำ" เป็น "นํา" ทำให้ฟอนต์เพี้ยน (ครอบงํา/ทํา/นํา)
+    // NFC ปกติซ่อมไม่ได้ (สระอำไม่มี canonical decomposition) → ต้อง replace เอง
+    .replace(/ํา/g, 'ำ')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
@@ -207,17 +211,18 @@ async function dailyReading(chart, date = new Date()) {
   const tarot = await tarotByType(theme || 'free') || await tarotByType('free');
   if (tarot) tarot.theme = theme;   // ให้ formatter ติดป้าย "ไพ่การเงินประจำวัน" ฯลฯ
 
-  // กันดวงซ้ำ: อาทิตย์เคลื่อนช้า (~1°/วัน) มุมค้างได้หลายวัน
-  // ถ้าชุดมุมวันนี้เหมือนเมื่อวานเป๊ะ → ถือว่า "ดวงนิ่ง" ไม่ส่งคำทำนายซ้ำ ส่งไพ่อย่างเดียว
-  let calm = aspects.length === 0;
-  if (!calm) {
-    const prevDate = new Date(date);
-    prevDate.setDate(prevDate.getDate() - 1);
-    const prev = await transitReading(chart, prevDate, DAILY_PLANETS, 3);
-    if (aspectSig(prev) === aspectSig(aspects)) calm = true;
-  }
-
-  const shown = calm ? [] : aspects;
+  // กันดวงซ้ำทุกวัน: ดาวช้า (อาทิตย์ทำมุมกับดาวนอก เช่น พลูโต/เสาร์) ค้างในออร์บได้หลายวัน
+  //   ฉาก (Square) ออร์บ 3° + อาทิตย์เดิน ~1°/วัน → "อาทิตย์ฉากพลูโต" ค้าง ~6 วัน
+  // เดิมเทียบ "ทั้งชุด" ว่าตรงเมื่อวานไหม — แต่จันทร์ (เร็ว) เปลี่ยนทุกวัน ชุดเลยไม่มีทางตรง
+  //   → มุมอาทิตย์ที่ค้างโผล่ซ้ำทุกวัน. แก้เป็นกรอง "เฉพาะมุมที่เพิ่งเข้าใหม่วันนี้ (ไม่มีเมื่อวาน)"
+  //   มุมช้าที่ค้าง = มีเมื่อวานด้วย → ตัดออก (โชว์แค่วันแรกที่เข้า)  ·  มุมจันทร์ใหม่ = โชว์ต่อ
+  const key = a => `${a.aspecting_planet}-${a.aspect}-${a.aspected_planet}`;
+  const prevDate = new Date(date);
+  prevDate.setDate(prevDate.getDate() - 1);
+  const prev    = await transitReading(chart, prevDate, DAILY_PLANETS, 3);
+  const prevSet = new Set(prev.map(key));
+  const shown   = aspects.filter(a => !prevSet.has(key(a)));   // เอาเฉพาะมุมที่ไม่มีเมื่อวาน
+  const calm    = shown.length === 0;
   return {
     date: date.toISOString().slice(0, 10),
     aspects: shown,

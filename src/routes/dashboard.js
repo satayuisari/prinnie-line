@@ -4,6 +4,9 @@ const db = require('../db');
 const inbox = require('../services/supportInbox');
 const supportAI = require('../services/supportAI');
 const triage = require('../services/supportTriage');
+const orders = require('../services/paymentOrders');
+const subscribers = require('../services/subscriberService');
+const lineMessaging = require('../services/lineMessaging');
 
 const PRICE = 399;
 const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -56,7 +59,26 @@ function inboxCard(m, aiOn, key) {
     </div></div>`;
 }
 
-function render({ s, recent }, msgs, aiOn, key) {
+// การ์ดออเดอร์ PromptPay ที่รอ staff อนุมัติ (มีปุ่มดูสลิป + อนุมัติ +30 วัน)
+function payCard(o, key) {
+  const baht = (o.amount / 100).toLocaleString();
+  const k = encodeURIComponent(key);
+  const slip = o.slip_message_id
+    ? `<a class="sliplink" href="/dashboard/payment/${o.ref}/slip?key=${k}" target="_blank">🧾 ดูสลิป</a>`
+    : `<span class="muted">⏳ ยังไม่ส่งสลิป</span>`;
+  return `<div class="icard${o.slip_message_id ? ' hi-pay' : ''}">
+    <div class="imeta">
+      <span class="cat" style="background:#1faa59">฿${baht}</span>
+      <span class="who">${esc(o.line_user_id).slice(0, 14)}…</span>
+      <span class="muted">${o.slip_at ? 'สลิป ' + esc(o.slip_at) : 'สร้าง ' + esc(o.created)}</span>
+      <span class="muted" style="font-family:monospace">${esc(o.ref)}</span></div>
+    <div class="irow">
+      ${slip}
+      <button class="snd" onclick="approve('${o.ref}')">✅ อนุมัติ +30 วัน</button>
+    </div></div>`;
+}
+
+function render({ s, recent }, msgs, pays, aiOn, key) {
   const mrr = (s.paying * PRICE).toLocaleString();   // นับเฉพาะลูกค้าจ่ายจริง (ตัด tester/free/admin)
   // funnel: ผู้ติดตาม → ลงทะเบียนดวง → สมาชิกจ่ายเงิน
   const regRate = s.total ? Math.round(s.registered / s.total * 100) : 0;       // แอด → ลงทะเบียน (จุดที่อุด 966→14)
@@ -67,6 +89,9 @@ function render({ s, recent }, msgs, aiOn, key) {
     <td class="muted">${esc(r.created)}</td></tr>`).join('');
   const inboxHtml = msgs.length ? msgs.map(m => inboxCard(m, aiOn, key)).join('')
     : '<div class="muted" style="padding:24px">ยังไม่มีข้อความรอตอบ 🎉</div>';
+  const payHtml = pays.length ? pays.map(o => payCard(o, key)).join('')
+    : '<div class="muted" style="padding:24px">ไม่มีรายการรอตรวจสอบการชำระเงิน 🎉</div>';
+  const slipWaiting = pays.filter(o => o.slip_message_id).length;   // ส่งสลิปแล้ว รออนุมัติ
   const now = new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' });
   return `<!doctype html><html lang="th"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -99,11 +124,16 @@ function render({ s, recent }, msgs, aiOn, key) {
   .irow{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
   .irow button{border:none;border-radius:8px;padding:8px 12px;font-size:12px;cursor:pointer;font-weight:600;color:#fff}
   .ai{background:#6B3FA0}.snd{background:#1faa59}.cls{background:#555}
+  .icard.hi-pay{border-left:3px solid #1faa59}
+  .sliplink{display:inline-flex;align-items:center;background:rgba(127,216,232,.15);color:#7FD8E8;
+            border:1px solid rgba(127,216,232,.4);border-radius:8px;padding:8px 12px;font-size:12px;
+            font-weight:600;text-decoration:none}
 </style></head><body>
   <h1>🔮 Prinnie333 · Dashboard</h1>
   <div class="ts">อัปเดต ${now}</div>
   <div class="tabs">
     <button class="tb on" id="t-sub" onclick="tab('sub')">📊 Subscription</button>
+    <button class="tb" id="t-pay" onclick="tab('pay')">💸 Payments <span id="pbadge">${slipWaiting ? '('+slipWaiting+')' : ''}</span></button>
     <button class="tb" id="t-sup" onclick="tab('sup')">🛟 Support <span id="ibadge">${msgs.length ? '('+msgs.length+')' : ''}</span></button>
   </div>
 
@@ -127,6 +157,11 @@ function render({ s, recent }, msgs, aiOn, key) {
     <table><tbody>${rows || '<tr><td class="muted">ยังไม่มีสมาชิก</td></tr>'}</tbody></table>
   </div>
 
+  <div class="pane" id="p-pay">
+    <div class="sec" style="margin-top:0">PromptPay รอตรวจสอบ — โอนแล้วส่งสลิปเข้าแชท · กดดูสลิป → อนุมัติ +30 วัน</div>
+    <div id="pays">${payHtml}</div>
+  </div>
+
   <div class="pane" id="p-sup">
     <div class="sec" style="margin-top:0">ข้อความลูกค้ารอตอบ ${aiOn ? '' : '· (ใส่ ANTHROPIC_API_KEY เพื่อเปิดปุ่ม AI ร่าง)'}</div>
     <div id="inbox">${inboxHtml}</div>
@@ -135,10 +170,17 @@ function render({ s, recent }, msgs, aiOn, key) {
 <script>
   const KEY = ${JSON.stringify(key)};
   function tab(n){
-    document.getElementById('p-sub').classList.toggle('on', n==='sub');
-    document.getElementById('p-sup').classList.toggle('on', n==='sup');
-    document.getElementById('t-sub').classList.toggle('on', n==='sub');
-    document.getElementById('t-sup').classList.toggle('on', n==='sup');
+    ['sub','pay','sup'].forEach(x=>{
+      document.getElementById('p-'+x).classList.toggle('on', n===x);
+      document.getElementById('t-'+x).classList.toggle('on', n===x);
+    });
+  }
+  async function approve(ref){
+    if(!confirm('ยืนยันการชำระเงิน + เปิดสมาชิก +30 วัน?')) return;
+    const r = await post('/dashboard/payment/'+ref+'/approve?key='+encodeURIComponent(KEY));
+    if(r.ok){ const j=await r.json(); document.querySelector('[onclick="approve(\\''+ref+'\\')"]').closest('.icard').remove();
+      alert(j.already ? 'อนุมัติไปแล้วก่อนหน้านี้' : '✅ เปิดสมาชิกแล้ว ถึง '+(j.expire||'').slice(0,10)); }
+    else { alert('อนุมัติไม่สำเร็จ'); }
   }
   async function post(url){ const r = await fetch(url, {method:'POST',headers:{'Content-Type':'application/json'}}); return r; }
   async function aiDraft(id){
@@ -172,9 +214,43 @@ function register(app) {
   app.get('/dashboard', async (req, res) => {
     if (!ok(req)) return res.status(401).send('unauthorized');
     try {
-      const [stats, msgs] = await Promise.all([getStats(), inbox.listOpen()]);
-      res.set('Cache-Control', 'no-store').send(render(stats, msgs, supportAI.isEnabled(), req.query.key));
+      const [stats, msgs, pays] = await Promise.all([
+        getStats(), inbox.listOpen(), orders.listPendingPromptpay(),
+      ]);
+      res.set('Cache-Control', 'no-store').send(render(stats, msgs, pays, supportAI.isEnabled(), req.query.key));
     } catch (e) { res.status(500).send('error: ' + esc(e.message)); }
+  });
+
+  // รูปสลิปของออเดอร์ (ดึงจาก LINE ด้วย messageId) — สตรีมเป็นรูปให้ staff ดู
+  app.get('/dashboard/payment/:ref/slip', async (req, res) => {
+    if (!ok(req)) return res.status(401).send('unauthorized');
+    try {
+      const o = await orders.get(req.params.ref);
+      if (!o || !o.slip_message_id) return res.status(404).send('no slip');
+      const buf = await lineMessaging.getMessageContent(o.slip_message_id);
+      if (!buf) return res.status(502).send('slip unavailable (อาจหมดอายุ — ขอให้ลูกค้าส่งใหม่)');
+      res.set('Content-Type', 'image/jpeg').set('Cache-Control', 'no-store').send(buf);
+    } catch (e) { res.status(500).send('error: ' + esc(e.message)); }
+  });
+
+  // staff อนุมัติการชำระเงิน → mark PAID (idempotent) + เปิดสมาชิก +30 วัน + แจ้งลูกค้า
+  app.post('/dashboard/payment/:ref/approve', async (req, res) => {
+    if (!ok(req)) return res.status(401).json({ error: 'unauthorized' });
+    try {
+      const o = await orders.get(req.params.ref);
+      if (!o) return res.status(404).json({ error: 'not_found' });
+      if (o.status === 'PAID') return res.json({ ok: true, already: true });
+      if (!(await orders.markPaid(o.ref, 'promptpay-slip'))) return res.json({ ok: true, already: true });
+
+      const r = await subscribers.activateSubscription(o.line_user_id, o.ref, 30);
+      const expTH = new Date(r.expire_date).toLocaleDateString('th-TH', {
+        year: 'numeric', month: 'long', day: 'numeric',
+      });
+      await lineMessaging.pushText(o.line_user_id,
+        `ชำระเงินสำเร็จ! ✨\n\nสมาชิก Prinnie333 ของคุณใช้ได้ถึง ${expTH}\nรับดวงประจำวันทุกเช้า 08:00 น. 🌟`).catch(() => {});
+      console.log(`[dashboard] approved ${o.ref} → activated ${o.line_user_id} until ${r.expire_date}`);
+      res.json({ ok: true, expire: r.expire_date });
+    } catch (e) { console.error('[dashboard] approve:', e.message); res.status(500).json({ error: e.message }); }
   });
 
   app.get('/dashboard/inbox', async (req, res) => {
