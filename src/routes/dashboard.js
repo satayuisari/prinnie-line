@@ -7,6 +7,7 @@ const triage = require('../services/supportTriage');
 const orders = require('../services/paymentOrders');
 const subscribers = require('../services/subscriberService');
 const lineMessaging = require('../services/lineMessaging');
+const couplePurchase = require('../services/couplePurchase');
 
 const PRICE = 399;
 const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -66,9 +67,11 @@ function payCard(o, key) {
   const slip = o.slip_message_id
     ? `<a class="sliplink" href="/dashboard/payment/${o.ref}/slip?key=${k}" target="_blank">🧾 ดูสลิป</a>`
     : `<span class="muted">⏳ ยังไม่ส่งสลิป</span>`;
+  const kind = o.type === 'couple' ? '💞 ดวงคู่' : '💎 สมาชิก';
   return `<div class="icard${o.slip_message_id ? ' hi-pay' : ''}">
     <div class="imeta">
       <span class="cat" style="background:#1faa59">฿${baht}</span>
+      <span class="muted">${kind}</span>
       <span class="who">${esc(o.line_user_id).slice(0, 14)}…</span>
       <span class="muted">${o.slip_at ? 'สลิป ' + esc(o.slip_at) : 'สร้าง ' + esc(o.created)}</span>
       <span class="muted" style="font-family:monospace">${esc(o.ref)}</span></div>
@@ -241,6 +244,13 @@ function register(app) {
       if (!o) return res.status(404).json({ error: 'not_found' });
       if (o.status === 'PAID') return res.json({ ok: true, already: true });
       if (!(await orders.markPaid(o.ref, 'promptpay-slip'))) return res.json({ ok: true, already: true });
+
+      // ดวงคู่ = ปลดล็อกอ่านผลเต็ม (ไม่ใช่ต่ออายุสมาชิก)
+      if (o.type === 'couple') {
+        await couplePurchase.fulfill(o).catch(e => console.error('[dashboard] couple fulfill:', e.message));
+        console.log(`[dashboard] approved ${o.ref} → couple unlocked for ${o.line_user_id}`);
+        return res.json({ ok: true, couple: true });
+      }
 
       const r = await subscribers.activateSubscription(o.line_user_id, o.ref, 30);
       const expTH = new Date(r.expire_date).toLocaleDateString('th-TH', {

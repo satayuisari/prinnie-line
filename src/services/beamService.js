@@ -11,7 +11,7 @@ const PROD_BASE = 'https://api.beamcheckout.com';
 const SANDBOX_BASE = 'https://playground.api.beamcheckout.com';
 
 const PRICE_THB        = Number(process.env.SUB_PRICE_THB)    || 399;   // สมาชิกรายเดือน
-const COUPLE_PRICE_THB = Number(process.env.COUPLE_PRICE_THB) || 149;   // ปลดล็อกดวงคู่ครั้งเดียว
+const COUPLE_PRICE_THB = Number(process.env.COUPLE_PRICE_THB) || 199;   // ปลดล็อกดวงคู่ครั้งเดียว
 
 function base() {
   return process.env.BEAM_ENV === 'production' ? PROD_BASE : SANDBOX_BASE;

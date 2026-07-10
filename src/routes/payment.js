@@ -41,7 +41,7 @@ router.post('/create-promptpay', requireAuth, async (req, res) => {
 router.get('/order/:ref', async (req, res) => {
   const o = await orders.get(req.params.ref);
   if (!o) return res.status(404).json({ error: 'not_found' });
-  res.json({ ref: o.ref, amount: o.amount, price_thb: o.amount / 100, status: o.status });
+  res.json({ ref: o.ref, amount: o.amount, price_thb: o.amount / 100, status: o.status, type: o.type });
 });
 
 // QR PromptPay ของออเดอร์ (จำนวนเงินฝังในคิวอาร์ → ลูกค้าสแกนแล้วยอดขึ้นเอง)

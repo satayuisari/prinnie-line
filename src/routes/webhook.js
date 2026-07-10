@@ -129,8 +129,9 @@ async function handleEvent(event) {
   if (event.type === 'message' && event.message.type === 'image') {
     const order = await paymentOrders.attachSlip(event.source.userId, event.message.id).catch(() => null);
     if (order) {
+      const what = order.type === 'couple' ? 'ปลดล็อกผลดวงคู่' : 'เปิดใช้งานสมาชิก';
       return replyMessage(event.replyToken, { type: 'text', text:
-        'ได้รับสลิปแล้วค่ะ ✨\nทีมงานกำลังตรวจสอบการชำระเงิน จะเปิดใช้งานสมาชิกให้ภายใน 24 ชม. แล้วแจ้งกลับนะคะ 🙏' });
+        `ได้รับสลิปแล้วค่ะ ✨\nทีมงานกำลังตรวจสอบการชำระเงิน จะ${what}ให้ภายใน 24 ชม. แล้วแจ้งกลับนะคะ 🙏` });
     }
     return;
   }

@@ -35,7 +35,7 @@
 <body>
   <div class="wrap">
     <div class="logo">PRINNIE333</div>
-    <h1>สมัครสมาชิกรายเดือน</h1>
+    <h1 id="title">สมัครสมาชิกรายเดือน</h1>
     <div class="sub">สแกนจ่ายผ่าน PromptPay แล้วส่งสลิปกลับมาในแชท</div>
 
     <div class="err" id="err"></div>
@@ -69,6 +69,7 @@
       const d = await r.json();
       if(!r.ok) throw new Error(d.error || 'ไม่พบรายการ');
       if(d.status === 'PAID'){ showErr('รายการนี้ชำระเงินเรียบร้อยแล้ว ✅'); return; }
+      if(d.type === 'couple'){ document.getElementById('title').textContent = 'ปลดล็อกผลดวงคู่'; }
       document.getElementById('amt').textContent = (d.price_thb || 399).toLocaleString();
       document.getElementById('qr').src = `/api/payment/promptpay-qr/${encodeURIComponent(ref)}`;
       document.getElementById('ref').textContent = 'รหัสอ้างอิง: ' + ref;

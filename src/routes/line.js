@@ -5,6 +5,7 @@ const horoscope   = require('../services/horoscopeService');
 const synastry    = require('../services/synastryService');
 const geocoding   = require('../services/geocodingService');
 const beamService = require('../services/beamService');
+const promptpay   = require('../services/promptpayService');
 const orders      = require('../services/paymentOrders');
 const coupleCard  = require('../services/coupleCard');
 const { computeNatalChart } = require('../astro/natalChart');
@@ -126,7 +127,7 @@ router.post('/synastry', requireAuth, async (req, res) => {
     return res.json({
       ...base,
       locked: true,
-      price: 149,
+      price: beamService.COUPLE_PRICE_THB,
       teaser: synastry.pickTeaser(reading.aspects),
     });
   } catch (err) {
@@ -135,10 +136,10 @@ router.post('/synastry', requireAuth, async (req, res) => {
   }
 });
 
-// ปลดล็อกดวงคู่ 149 (ครั้งเดียว) → Beam payment link. เก็บข้อมูลคู่ใน payment_orders
-// (Beam ไม่ส่ง metadata กลับเหมือน Stripe → webhook lookup จาก ref). ถ้ายังไม่ตั้ง Beam → 410
+// ปลดล็อกดวงคู่ (ครั้งเดียว) → PromptPay QR + สลิป. เก็บข้อมูลคู่ใน payment_orders.payload
+// staff อนุมัติสลิปบน dashboard → couplePurchase.fulfill() push ผลเต็ม. ถ้ายังไม่ตั้ง PromptPay → 410
 router.post('/couple-checkout', requireAuth, async (req, res) => {
-  if (!beamService.isEnabled()) {
+  if (!promptpay.isEnabled()) {
     return res.status(410).json({
       disabled: true,
       error: 'ช่องทางชำระเงินกำลังปรับปรุง โปรดติดต่อทีมงานสักครู่นะคะ ✨',
@@ -150,14 +151,14 @@ router.post('/couple-checkout', requireAuth, async (req, res) => {
     const ref = await orders.create({
       type: 'couple',
       line_user_id: req.line.userId,
-      amount: beamService.COUPLE_PRICE_THB * 100,
+      amount: promptpay.COUPLE_PRICE_THB * 100,
+      method: 'promptpay',
       payload: { partner_name, birth_date, birth_time, birth_place, lat, lng },
     });
-    const { url } = await beamService.createCoupleLink(ref, partner_name);
-    res.json({ url });
+    res.json({ url: `${baseUrl(req)}/pay.html?ref=${ref}` });
   } catch (err) {
     console.error('[couple-checkout]', err.message);
-    res.status(500).json({ error: 'สร้างหน้าจ่ายเงินไม่สำเร็จ ลองใหม่อีกครั้งนะคะ' });
+    res.status(500).json({ error: 'สร้างคำสั่งซื้อไม่สำเร็จ ลองใหม่อีกครั้งนะคะ' });
   }
 });
 
