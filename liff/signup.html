@@ -99,9 +99,9 @@
       <label for="time_unknown">ไม่ทราบเวลาเกิด (จะคำนวณลัคนาไม่ได้)</label>
     </div>
 
-    <label>สถานที่เกิด <span style="color:rgba(255,255,255,0.4);font-weight:400">(ไม่บังคับ)</span></label>
+    <label>สถานที่เกิด <span style="color:#E8C77A;font-weight:600">(จำเป็นสำหรับลัคนา)</span></label>
     <input type="text" id="birth_place" placeholder="เช่น กรุงเทพมหานคร" />
-    <div class="hint">ใส่เพื่อคำนวณ “ลัคนา” ให้แม่นขึ้น — ไม่ใส่ก็ดูดวงได้เลย (อาทิตย์/จันทร์/เลขชีวิต)</div>
+    <div class="hint">🌙 ลัคนาต้องใช้ทั้ง “เวลาเกิด” และ “สถานที่เกิด” — ใส่จังหวัดที่เกิดเพื่อให้ลัคนาขึ้น</div>
 
     <button class="btn" id="btn-submit" onclick="submitForm()">คำนวณดวงของฉัน →</button>
     <button class="btn btn-ghost" id="btn-goto-couple" style="display:none" onclick="showStep('step-couple-form')">💞 ดูดวงคู่กับคนพิเศษ</button>
@@ -303,7 +303,8 @@
 
     if (!birth_date)  return showError('กรุณาเลือกวันเกิด');
     if (!unknown && !birth_time) return showError('กรุณากรอกเวลาเกิด หรือเลือก "ไม่ทราบเวลา"');
-    // สถานที่เกิด = ไม่บังคับ (ไม่ใส่ = ไม่คำนวณลัคนา แต่ได้ดวงอื่นครบ) → ลดแรงเสียดทานฟอร์ม
+    // ลัคนาต้องใช้ เวลาเกิด + สถานที่เกิด(พิกัด) → ถ้ากรอกเวลาแล้ว บังคับกรอกสถานที่ด้วย (ไม่งั้นลัคนาไม่ขึ้น)
+    if (!unknown && !birth_place) return showError('กรอก “สถานที่เกิด” ด้วยนะคะ 🌙 เพื่อคำนวณลัคนา (เช่น กรุงเทพ)');
 
     const btn = document.getElementById('btn-submit');
     btn.disabled = true; btn.textContent = 'กำลังคำนวณ...';

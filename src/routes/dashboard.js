@@ -8,6 +8,7 @@ const orders = require('../services/paymentOrders');
 const subscribers = require('../services/subscriberService');
 const lineMessaging = require('../services/lineMessaging');
 const couplePurchase = require('../services/couplePurchase');
+const paymentApprove = require('../services/paymentApprove');
 
 const PRICE = 399;
 const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -77,7 +78,7 @@ function payCard(o, key) {
       <span class="muted" style="font-family:monospace">${esc(o.ref)}</span></div>
     <div class="irow">
       ${slip}
-      <button class="snd" onclick="approve('${o.ref}')">✅ อนุมัติ +30 วัน</button>
+      <button class="snd" onclick="approve('${o.ref}','${o.type}')">✅ ${o.type === 'couple' ? 'อนุมัติ (ปลดล็อกดวงคู่)' : 'อนุมัติ (+30 วัน)'}</button>
     </div></div>`;
 }
 
@@ -178,11 +179,15 @@ function render({ s, recent }, msgs, pays, aiOn, key) {
       document.getElementById('t-'+x).classList.toggle('on', n===x);
     });
   }
-  async function approve(ref){
-    if(!confirm('ยืนยันการชำระเงิน + เปิดสมาชิก +30 วัน?')) return;
+  async function approve(ref, type){
+    const isCouple = type === 'couple';
+    if(!confirm(isCouple ? 'ยืนยันการชำระเงิน + ปลดล็อกดวงคู่ (ครั้งเดียว)?' : 'ยืนยันการชำระเงิน + เปิดสมาชิก +30 วัน?')) return;
     const r = await post('/dashboard/payment/'+ref+'/approve?key='+encodeURIComponent(KEY));
-    if(r.ok){ const j=await r.json(); document.querySelector('[onclick="approve(\\''+ref+'\\')"]').closest('.icard').remove();
-      alert(j.already ? 'อนุมัติไปแล้วก่อนหน้านี้' : '✅ เปิดสมาชิกแล้ว ถึง '+(j.expire||'').slice(0,10)); }
+    if(r.ok){ const j=await r.json();
+      const btn=document.querySelector('[onclick*="'+ref+'"]'); if(btn) btn.closest('.icard').remove();
+      alert(j.already ? 'อนุมัติไปแล้วก่อนหน้านี้'
+            : (j.couple ? '✅ ปลดล็อกดวงคู่ + ส่งผลให้ลูกค้าแล้ว (ไม่ใช่สมาชิก 30 วัน)'
+                        : '✅ เปิดสมาชิกแล้ว ถึง '+(j.expire||'').slice(0,10))); }
     else { alert('อนุมัติไม่สำเร็จ'); }
   }
   async function post(url){ const r = await fetch(url, {method:'POST',headers:{'Content-Type':'application/json'}}); return r; }
@@ -242,24 +247,9 @@ function register(app) {
     try {
       const o = await orders.get(req.params.ref);
       if (!o) return res.status(404).json({ error: 'not_found' });
-      if (o.status === 'PAID') return res.json({ ok: true, already: true });
-      if (!(await orders.markPaid(o.ref, 'promptpay-slip'))) return res.json({ ok: true, already: true });
-
-      // ดวงคู่ = ปลดล็อกอ่านผลเต็ม (ไม่ใช่ต่ออายุสมาชิก)
-      if (o.type === 'couple') {
-        await couplePurchase.fulfill(o).catch(e => console.error('[dashboard] couple fulfill:', e.message));
-        console.log(`[dashboard] approved ${o.ref} → couple unlocked for ${o.line_user_id}`);
-        return res.json({ ok: true, couple: true });
-      }
-
-      const r = await subscribers.activateSubscription(o.line_user_id, o.ref, 30);
-      const expTH = new Date(r.expire_date).toLocaleDateString('th-TH', {
-        year: 'numeric', month: 'long', day: 'numeric',
-      });
-      await lineMessaging.pushText(o.line_user_id,
-        `ชำระเงินสำเร็จ! ✨\n\nสมาชิก Prinnie333 ของคุณใช้ได้ถึง ${expTH}\nรับดวงประจำวันทุกเช้า 08:00 น. 🌟`).catch(() => {});
-      console.log(`[dashboard] approved ${o.ref} → activated ${o.line_user_id} until ${r.expire_date}`);
-      res.json({ ok: true, expire: r.expire_date });
+      const result = await paymentApprove.approve(o, 'promptpay-slip');
+      console.log(`[dashboard] approved ${o.ref} (${o.type})`, result.couple ? 'couple' : ('→ ' + (result.expire || result.already)));
+      res.json(result);
     } catch (e) { console.error('[dashboard] approve:', e.message); res.status(500).json({ error: e.message }); }
   });
 

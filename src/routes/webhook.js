@@ -1,7 +1,10 @@
 const line        = require('@line/bot-sdk');
 const subscribers = require('../services/subscriberService');
 const horoscope   = require('../services/horoscopeService');
-const { replyMessage, isAllowed, TEST_MODE, client } = require('../services/lineMessaging');
+const { replyMessage, isAllowed, TEST_MODE, client, getMessageContent } = require('../services/lineMessaging');
+const slipVerify     = require('../services/slipVerify');
+const paymentApprove = require('../services/paymentApprove');
+const dailyTeaser    = require('../services/dailyTeaser');
 const flex         = require('../marketing/flexTemplates');
 const supportInbox = require('../services/supportInbox');
 const supportAI    = require('../services/supportAI');
@@ -28,6 +31,19 @@ const PAYWALL_PROMPT = {
   type: 'text',
   text: `ฟีเจอร์นี้สำหรับสมาชิก Prinnie333 ✨\n\nสมัคร/ต่ออายุ เพียง 399 บาท/เดือน\nรับดวงส่วนตัวทุกเช้า + ผูกดวงคู่ + ดวงรายสัปดาห์/เดือน/ปี\n\n👉 ${LIFF_URL}`,
 };
+
+// คนเยอะพิมพ์ "วันเกิด" เข้าแชทตรง ๆ (นึกว่าบอกบอทได้) — ระบบคำนวณจากข้อความไม่ได้
+// ดักไว้แล้วพาไปกรอกฟอร์ม (แก้ปัญหาหลังเปิดตัว: คนงงว่าทำไมไม่ได้ดวง)
+const TH_MONTH_RE = /(มกรา|กุมภา|มีนา|เมษา|พฤษภา|มิถุนา|กรกฎา|สิงหา|กันยา|ตุลา|พฤศจิกา|ธันวา|ม\.ค|ก\.พ|มี\.ค|เม\.ย|พ\.ค|มิ\.ย|ก\.ค|ส\.ค|ก\.ย|ต\.ค|พ\.ย|ธ\.ค)/;
+function looksLikeBirthData(t) {
+  if (/(วันเกิด|เวลาเกิด|สถานที่เกิด|เกิดวันที่|วันที่เกิด|เกิดปี|เกิดเมื่อ|เกิดวัน)/.test(t)) return true;
+  if (TH_MONTH_RE.test(t)) return true;                                  // ชื่อเดือนไทย
+  if (/(?:^|\D)(19\d{2}|20\d{2}|25\d{2})(?:\D|$)/.test(t)) return true;   // ปี ค.ศ./พ.ศ.
+  if (/\d{1,2}\s*[/.\-]\s*\d{1,2}\s*[/.\-]\s*\d{2,4}/.test(t)) return true; // 12/05/2530
+  return false;
+}
+const BIRTH_GUIDE = (liff) =>
+  `ขอบคุณที่สนใจนะคะ 🌙\nดวงส่วนตัวต้อง “กรอกวันเกิดในฟอร์ม” ก่อนนะคะ — พิมพ์ในแชทระบบยังคำนวณให้ไม่ได้ค่ะ\n\n👉 กรอกที่นี่เลย: ${liff}\n\nกรอกเสร็จรับพื้นดวงส่วนตัวฟรีทันที (อาทิตย์ · จันทร์ · ลัคนา) ✨`;
 
 // ปุ่ม quick reply เลือกช่วงเวลา (ติดท้ายข้อความดวง)
 const PERIOD_QR = {
@@ -128,25 +144,50 @@ async function handleEvent(event) {
   // มีออเดอร์ค้าง → ตอบรับสลิป (staff อนุมัติบน dashboard). ไม่มี → รูปทั่วไป เงียบไว้ให้ staff ดูแล
   if (event.type === 'message' && event.message.type === 'image') {
     const order = await paymentOrders.attachSlip(event.source.userId, event.message.id).catch(() => null);
-    if (order) {
-      const what = order.type === 'couple' ? 'ปลดล็อกผลดวงคู่' : 'เปิดใช้งานสมาชิก';
+    if (!order) return;   // ไม่มีออเดอร์ค้าง = รูปทั่วไป เงียบ
+    const what = order.type === 'couple' ? 'ปลดล็อกดวงคู่' : 'เปิดใช้งานสมาชิก';
+
+    // ✅ ตรวจสลิปอัตโนมัติด้วย SlipOK → เงินเข้าจริง + ยอดถูก = เปิดใช้งานทันที ไม่ต้องรอ staff
+    if (slipVerify.isEnabled()) {
+      const expected = order.amount / 100;
+      const buf = await getMessageContent(event.message.id);
+      const v = buf ? await slipVerify.verify(buf, expected) : { ok: false, reason: 'ดึงรูปสลิปไม่ได้' };
+      if (v.ok && Math.abs(v.amount - expected) < 1) {
+        await paymentApprove.approve(order, 'slipok-' + (v.ref || Date.now())).catch(e => console.error('[slip] approve:', e.message));
+        return replyMessage(event.replyToken, { type: 'text', text:
+          `✅ ยืนยันการชำระเงินอัตโนมัติเรียบร้อย ${what}ให้แล้วค่ะ 🎉` });
+      }
+      console.warn(`[slip] ตรวจไม่ผ่าน ${order.ref}: ${v.reason} (code ${v.code || '-'})`);
+      const detail = v.dup ? ' (สลิปนี้เคยใช้ไปแล้วนะคะ)' : '';
       return replyMessage(event.replyToken, { type: 'text', text:
-        `ได้รับสลิปแล้วค่ะ ✨\nทีมงานกำลังตรวจสอบการชำระเงิน จะ${what}ให้ภายใน 24 ชม. แล้วแจ้งกลับนะคะ 🙏` });
+        `ได้รับสลิปแล้วค่ะ ✨${detail}\nทีมงานกำลังตรวจสอบการชำระเงิน จะ${what}ให้เร็วที่สุดนะคะ 🙏` });
     }
-    return;
+
+    // ไม่มี SlipOK → รอ staff อนุมัติ (เหมือนเดิม)
+    return replyMessage(event.replyToken, { type: 'text', text:
+      `ได้รับสลิปแล้วค่ะ ✨\nทีมงานกำลังตรวจสอบการชำระเงิน จะ${what}ให้ภายใน 24 ชม. แล้วแจ้งกลับนะคะ 🙏` });
   }
 
   // ปุ่ม rich menu ส่ง postback / ข้อความพิมพ์ → เดาเจตนา
-  //   คีย์เวิร์ดดวงคู่ → synastry, คีย์เวิร์ดช่วยเหลือ/ทักทาย → help
-  //   ข้อความอื่น → เงียบ (return) ให้พนักงานตอบแชทเอง ไม่ให้บอทแย่งตอบ
+  //   ครอบคลุมทุกฟีเจอร์ (ลูกค้าพิมพ์ "ดูดวงรายเดือน" แล้วบอทเงียบ = ดูพัง — feedback 13/07)
+  //   ข้อความอื่น → เงียบ (return) ให้ AI/พนักงานตอบ ไม่ให้บอทแย่งตอบ
   let action = null;
   if (event.type === 'postback') {
     action = new URLSearchParams(event.postback.data).get('action');
   } else if (event.type === 'message' && event.message.type === 'text') {
     const t = (event.message.text || '').trim();
-    if (/คู่|ผูกดวง|ความรัก|แฟน/.test(t)) action = 'synastry';
-    else if (/ช่วยเหลือ|วิธีใช้|เมนู|help|สวัสดี|hello|hi|^\?+$/i.test(t)) action = 'help';
-    else action = null;
+    // เฉพาะข้อความสั้นแบบสั่งงาน — ประโยคยาว = คำถามจริง ปล่อยให้ AI/staff ตอบ
+    if (t.length <= 30) {
+      if (/รายสัปดาห|ดวงสัปดาห|สัปดาห์นี้/.test(t)) action = 'weekly';
+      else if (/รายเดือ|ดวงเดือน|เดือนนี้|ประจำเดือน/.test(t)) action = 'monthly';   // "รายเดือ" กัน typo เช่น "รายเดือร"
+      else if (/รายปี|ดวงปี|ปีนี้|ประจำปี/.test(t)) action = 'annual';
+      else if (/รายวัน|ดวงวันนี้|^วันนี้$|^ดูดวง$|^ดวง$/.test(t)) action = 'daily';
+      else if (/พื้นดวง|ดวงกำเนิด|ลัคนา/.test(t)) action = 'natal';
+      else if (/ไพ่|ทาโร/.test(t)) action = 'tarot';
+      else if (/โปรไฟล์|แก้ไขข้อมูล|ข้อมูลของฉัน/.test(t)) action = 'profile';
+      else if (/คู่|ผูกดวง|ความรัก|แฟน/.test(t)) action = 'synastry';
+      else if (/ช่วยเหลือ|วิธีใช้|เมนู|help|สวัสดี|hello|hi|^\?+$/i.test(t)) action = 'help';
+    }
   }
 
   // ข้อความที่บอทไม่ตอบ (non-keyword) → เก็บเข้า support inbox
@@ -158,6 +199,16 @@ async function handleEvent(event) {
     let name = null;
     try { name = (await lineClient_safeProfile(event.source.userId)); } catch (_) {}
     const id = await supportInbox.capture(event.source.userId, name, text).catch(() => null);
+
+    // 🎂 พิมพ์วันเกิดเข้าแชท → พาไปกรอกฟอร์ม (ก่อน AI จะได้ไม่ตอบมั่ว) — เฉพาะคนที่ยังไม่มีดวง
+    if (looksLikeBirthData(text)) {
+      const sub = await subscribers.getByLineUserId(event.source.userId).catch(() => null);
+      if (!sub || !sub.chart_data) {
+        const guide = BIRTH_GUIDE(LIFF_URL);
+        if (id) await supportInbox.markAutoReplied(id, guide).catch(() => {});
+        return replyMessage(event.replyToken, { type: 'text', text: guide });
+      }
+    }
 
     if (id && process.env.AI_AUTOREPLY === 'true' && supportAI.isEnabled()) {
       const { category } = triage.classify(text);
@@ -191,23 +242,35 @@ async function handleEvent(event) {
   const active = !!(sub && sub.subscribe_end && new Date(sub.subscribe_end) > new Date());
   if (PAID.has(action)) {
     if (!sub || !sub.chart_data) return replyMessage(event.replyToken, SIGNUP_PROMPT);
-    if (!active) return replyMessage(event.replyToken, PAYWALL_PROMPT);
+    if (!active) {
+      // กดดูดวงวันนี้: วันแรกให้ "ดวงเต็มฟรี 1 วัน" (รวมทุกเรื่อง) → หลังจากนั้น teaser ล็อก
+      if (action === 'daily') {
+        try {
+          const free = await subscribers.claimFreeDaily(sub.line_user_id);
+          return replyMessage(event.replyToken,
+            await dailyTeaser.buildCombined('daily', sub.chart_data, sub.nickname, new Date(),
+              free ? { freeDay: true } : { locked: true }));
+        } catch (_) { return replyMessage(event.replyToken, PAYWALL_PROMPT); }
+      }
+      // สัปดาห์/เดือน/ปี สำหรับคนยังไม่จ่าย → teaser ล็อก (แยกงาน/รัก/เงิน)
+      try {
+        return replyMessage(event.replyToken,
+          await dailyTeaser.buildCombined(action, sub.chart_data, sub.nickname, new Date(), { locked: true }));
+      } catch (_) { return replyMessage(event.replyToken, PAYWALL_PROMPT); }
+    }
   }
 
   try {
     switch (action) {
       case 'daily': {
         if (!sub || !sub.chart_data) return replyMessage(event.replyToken, SIGNUP_PROMPT);
-        const reading = await horoscope.dailyReading(sub.chart_data, new Date());
-        return replyMessage(event.replyToken, buildMessages(reading, '✨ ดวงวันนี้', sub.nickname));
+        return replyMessage(event.replyToken, await dailyTeaser.buildCombinedDaily(sub.chart_data, sub.nickname));
       }
       case 'weekly':
       case 'monthly':
       case 'annual': {
         if (!sub || !sub.chart_data) return replyMessage(event.replyToken, SIGNUP_PROMPT);
-        const labels = { weekly: '📅 ดวงรายสัปดาห์', monthly: '🗓️ ดวงรายเดือน', annual: '✨ ดวงรายปี' };
-        const reading = await horoscope.periodReading(action, sub.chart_data, new Date());
-        return replyMessage(event.replyToken, buildMessages(reading, labels[action], sub.nickname));
+        return replyMessage(event.replyToken, await dailyTeaser.buildCombined(action, sub.chart_data, sub.nickname));
       }
       case 'natal': {
         if (!sub || !sub.chart_data) return replyMessage(event.replyToken, SIGNUP_PROMPT);
@@ -249,9 +312,11 @@ async function handleEvent(event) {
       }
       case 'help':
       default:
+        // แนบปุ่มช่วงเวลาให้กดต่อได้ทันที (ลูกค้าหาดวงรายสัปดาห์/เดือน/ปีไม่เจอ — feedback 13/07)
         return replyMessage(event.replyToken, {
           type: 'text',
-          text: `📖 วิธีใช้งาน Prinnie333\n\n• ☀️ ดูดวงวันนี้ — ดวงรายวันส่วนตัว\n• 🌟 พื้นดวง — ดวงกำเนิดของคุณ\n• 🃏 ไพ่ทาโรต์ — ไพ่ประจำวัน\n• 💞 ผูกดวงคู่ — ดูดวงความเข้ากันกับคนพิเศษ\n• 💎 สมัคร/ต่ออายุ/แก้ไขข้อมูล — ${LIFF_URL}\n\nดวงจะส่งอัตโนมัติทุกเช้า 08:00 น.\n\n💜 มีคำถามเพิ่มเติม พิมพ์ทักแชทได้เลย ทีมงานยินดีช่วยดูแลค่ะ`,
+          text: `📖 วิธีใช้งาน Prinnie333\n\n• ☀️ ดูดวงวันนี้ — พิมพ์ "รายวัน"\n• 📅 ดวงรายสัปดาห์ — พิมพ์ "รายสัปดาห์"\n• 🗓️ ดวงรายเดือน — พิมพ์ "รายเดือน"\n• ✨ ดวงรายปี — พิมพ์ "รายปี"\n• 🌟 พื้นดวง — ดวงกำเนิดของคุณ\n• 🃏 ไพ่ทาโรต์ — ไพ่ประจำวัน\n• 💞 ผูกดวงคู่ — ดูดวงความเข้ากันกับคนพิเศษ\n• 💎 สมัคร/ต่ออายุ/แก้ไขข้อมูล — ${LIFF_URL}\n\nกดปุ่มด้านล่างได้เลยค่ะ 👇 ดวงจะส่งอัตโนมัติทุกเช้า 08:00 น.\n\n💜 มีคำถามเพิ่มเติม พิมพ์ทักแชทได้เลย ทีมงานยินดีช่วยดูแลค่ะ`,
+          quickReply: PERIOD_QR,
         });
     }
   } catch (err) {

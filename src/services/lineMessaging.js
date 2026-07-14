@@ -67,4 +67,37 @@ async function broadcast(messages) {
   });
 }
 
-module.exports = { client, blobClient, getMessageContent, pushMessage, pushText, replyMessage, broadcast, isAllowed, TEST_MODE };
+// ════════ OA ที่ 2 (บัญชีใหญ่ @efb2738a) — ใช้ "เฉพาะบรอดแคสต์" ไม่ผูก webhook/LIFF ════════
+// ออก token จาก channel id/secret (client_credentials) → ไม่ต้องเก็บ token ที่หมดอายุ
+function oa2Enabled() {
+  return !!(process.env.LINE_CHANNEL_ID_2 && process.env.LINE_CHANNEL_SECRET_2);
+}
+async function oa2AccessToken() {
+  if (!oa2Enabled()) throw new Error('OA2 ยังไม่ตั้งค่า (LINE_CHANNEL_ID_2/SECRET_2)');
+  const r = await fetch('https://api.line.me/v2/oauth/accessToken', {
+    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `grant_type=client_credentials&client_id=${process.env.LINE_CHANNEL_ID_2}&client_secret=${process.env.LINE_CHANNEL_SECRET_2}`,
+  });
+  const j = await r.json();
+  if (!j.access_token) throw new Error('ออก token OA2 ไม่สำเร็จ: ' + JSON.stringify(j).slice(0, 120));
+  return j.access_token;
+}
+async function oa2Client() {
+  return new line.messagingApi.MessagingApiClient({ channelAccessToken: await oa2AccessToken() });
+}
+// broadcast บัญชีใหญ่ — gate TEST_MODE เหมือนกัน
+async function broadcastOA2(messages) {
+  if (TEST_MODE) throw new Error('[TEST_MODE] ❌ broadcast OA2 ถูกบล็อก');
+  const c = await oa2Client();
+  return c.broadcast({ messages: Array.isArray(messages) ? messages : [messages] });
+}
+// push บัญชีใหญ่ (ใช้ตอน preview หา owner บน OA2)
+async function pushOA2(lineUserId, messages) {
+  const c = await oa2Client();
+  return c.pushMessage({ to: lineUserId, messages: Array.isArray(messages) ? messages : [messages] });
+}
+
+module.exports = {
+  client, blobClient, getMessageContent, pushMessage, pushText, replyMessage, broadcast, isAllowed, TEST_MODE,
+  oa2Enabled, oa2AccessToken, oa2Client, broadcastOA2, pushOA2,
+};

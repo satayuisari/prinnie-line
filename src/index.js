@@ -14,6 +14,8 @@ const dashboard     = require('./routes/dashboard');
 const scheduler     = require('./scheduler/dailyHoroscope');
 const nudges        = require('./scheduler/nudges');
 const renewals      = require('./scheduler/renewals');
+const launchCast    = require('./scheduler/launchBroadcast');
+const perfReport    = require('./scheduler/perfReport');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -57,6 +59,8 @@ app.get('/health', (_, res) => res.json({ ok: true }));
 scheduler.start();
 nudges.start();
 renewals.start();
+launchCast.start();
+perfReport.start();
 
 const mode = process.env.TEST_MODE === 'true' ? '🧪 TEST_MODE (push เฉพาะ allowlist)' : '🚀 PRODUCTION';
 app.listen(PORT, () => {

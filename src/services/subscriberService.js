@@ -162,7 +162,30 @@ async function getActiveSubscribers() {
   return r.rows;
 }
 
+// เคลมสิทธิ์ "ฟรี 1 วัน" แบบ atomic — คืน true ถ้าเพิ่งได้สิทธิ์ (ยังไม่เคยใช้), false ถ้าใช้ไปแล้ว
+async function claimFreeDaily(line_user_id) {
+  const r = await db.query(
+    `UPDATE line_subscribers SET free_daily_at = NOW()
+     WHERE line_user_id = $1 AND free_daily_at IS NULL RETURNING id`,
+    [line_user_id]
+  );
+  return r.rows.length > 0;
+}
+
+// คนที่ "ลงทะเบียนแล้วแต่ยังไม่จ่าย" (มีดวง แต่ไม่ active) — เป้าหมาย teaser 8 โมงเช้า
+async function getRegisteredInactive() {
+  const r = await db.query(
+    `SELECT id, line_user_id, nickname, chart_data
+     FROM line_subscribers
+     WHERE chart_data IS NOT NULL
+       AND (subscribe_end IS NULL OR subscribe_end <= NOW())
+       AND status <> 'CANCELLED'
+     ORDER BY id`
+  );
+  return r.rows;
+}
+
 module.exports = {
   upsertSubscriber, getByLineUserId, getMemberStatus,
-  activateSubscription, getActiveSubscribers, captureFollower,
+  activateSubscription, getActiveSubscribers, getRegisteredInactive, claimFreeDaily, captureFollower,
 };

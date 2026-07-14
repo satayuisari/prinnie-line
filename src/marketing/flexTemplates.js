@@ -45,20 +45,69 @@ function msg(altText, contents) {
 
 // 1) เปิดตัว — เชิญรับพื้นดวงฟรี (ใช้ broadcast ทั้ง 10k ครั้งเดียว)
 function launchOffer(liffUrl) {
-  return msg('🎁 รับพื้นดวงส่วนตัวฟรีจาก Prinnie333', bubble({
+  return msg('🌙 ดวงจริง ไม่ใช่แค่ราศี — รับพื้นดวงฟรี', bubble({
     kicker: 'PRINNIE333',
-    title: 'ดวงของคุณ ไม่เหมือนใคร 🌙',
+    title: 'ดวงจริง ไม่ใช่แค่ราศี 🌙',
     lines: [
-      'เราคำนวณ “ดวงส่วนตัว” จากวัน เวลา และสถานที่เกิดจริงของคุณ',
-      'ไม่ใช่ดวง 12 ราศีทั่วไปที่ใครก็อ่านได้',
+      'ที่รู้สึกว่า “ดูดวงไม่ตรง” เพราะอ่านแค่ดวง 12 ราศี — ที่คนราศีเดียวกันได้เหมือนกันหมด',
+      'ดวงจริงของคุณดูจาก “ลัคนา” (ราศีที่ขึ้นตอนเกิด) + ตำแหน่งดวงดาวจริง ณ วันเวลาที่คุณเกิด',
+      'ลัคนาเปลี่ยนทุก ๆ 2 ชั่วโมง เกิดคนละเวลา ดวงก็คนละแบบ',
       '---',
-      '🎁 รับ “พื้นดวงส่วนตัว” ฟรีวันนี้',
-      'รู้จักอาทิตย์–จันทร์–ลัคนา และเลขชีวิตของคุณ',
+      '🎁 รับ “พื้นดวงส่วนตัว” ฟรี — รู้ลัคนา อาทิตย์ จันทร์ และเลขชีวิตของคุณ',
     ],
     buttonLabel: '🎁 รับดวงฟรี',
     buttonUri: liffUrl,
-    note: 'กรอกวันเกิด แล้วรอดูความแม่นค่ะ 💜',
+    note: 'กรอกวันเกิด (ใส่เวลาเกิดด้วย จะได้ลัคนาแม่น) 💜',
   }));
+}
+
+// 1b) เปิดตัวสำหรับ "บัญชีใหญ่" (@efb2738a 23k) — ดึงคนไปแอดบัญชีบริการ @prinnie333
+function launchBig(addFriendUrl) {
+  return msg('🌙 ดวงจริง ไม่ใช่แค่ราศี — รับพื้นดวงฟรี', bubble({
+    kicker: 'PRINNIE333',
+    title: 'ดูดวงไม่ตรง? เพราะดูแค่ราศี 🌙',
+    lines: [
+      'ดวง 12 ราศีที่ทุกคนอ่านเหมือนกัน มันเลยรู้สึกไม่ตรง',
+      'ดวงจริงดูจาก “ลัคนา” + ตำแหน่งดวงดาวจริง ตอนที่คุณเกิด',
+      'เกิดคนละเวลา ลัคนาคนละราศี — ดวงเลยเป็นของคุณคนเดียว',
+      '---',
+      '🎁 รับ “พื้นดวงส่วนตัว” ฟรี รู้ลัคนา อาทิตย์ จันทร์ ของคุณ',
+    ],
+    buttonLabel: '🎁 แอดรับดวงฟรี',
+    buttonUri: addFriendUrl,
+    note: 'แอด @prinnie333 แล้วเริ่มได้เลย 💜',
+  }));
+}
+
+// 1c) เปิดตัวแบบ "วิดีโอในการ์ด" (video hero) — รวมวิดีโอ+ข้อความ+ปุ่ม เป็น 1 บับเบิล
+//     ใช้ broadcast จริง (นับ 1 ข้อความ/คน). buttonUri ต่างกันตาม OA (บริการ→LIFF, ใหญ่→แอด)
+function launchVideo(videoUrl, previewUrl, buttonUri) {
+  return {
+    type: 'flex',
+    altText: '🌙 ดวงจริง ไม่ใช่แค่ราศี — รับพื้นดวงฟรี',
+    contents: {
+      type: 'bubble', size: 'mega',
+      hero: {
+        type: 'video', url: videoUrl, previewUrl, aspectRatio: '9:16',
+        altContent: { type: 'image', url: previewUrl, size: 'full', aspectRatio: '9:16', aspectMode: 'cover' },
+      },
+      body: {
+        type: 'box', layout: 'vertical', spacing: 'sm', backgroundColor: '#2A1B3D', paddingAll: '18px',
+        contents: [
+          { type: 'text', text: 'ดวงจริง ไม่ใช่แค่ราศี 🌙', weight: 'bold', size: 'lg', color: '#F6F1FF', wrap: true },
+          { type: 'text', text: 'ที่รู้สึกว่า “ดูดวงไม่ตรง” เพราะอ่านแค่ดวง 12 ราศี — ดวงจริงดูจาก “ลัคนา” และตำแหน่งดวงดาวจริง ณ วันเวลาที่คุณเกิด', size: 'sm', color: '#d9cff0', wrap: true },
+          { type: 'text', text: '🎁 รับพื้นดวงส่วนตัวฟรี — รู้ลัคนา อาทิตย์ จันทร์ ของคุณ', size: 'sm', color: '#E8C77A', wrap: true, margin: 'md' },
+        ],
+      },
+      footer: {
+        type: 'box', layout: 'vertical', backgroundColor: '#2A1B3D', paddingAll: '18px', paddingTop: '0px',
+        contents: [
+          { type: 'button', style: 'primary', color: '#E8C77A', height: 'sm',
+            action: { type: 'uri', label: '🎁 รับดวงฟรี', uri: buttonUri } },
+        ],
+      },
+    },
+  };
 }
 
 // 2) Upsell หลังเห็นพื้นดวง / nudge วันแรก — ชวนสมัคร 399 + โบนัสคู่
@@ -210,6 +259,6 @@ function welcomeCard(liffUrl) {
 }
 
 module.exports = {
-  welcomeCard, launchOffer, upsellSubscribe, coupleTeaser, earlyBirdEnding,
+  welcomeCard, launchOffer, launchBig, launchVideo, upsellSubscribe, coupleTeaser, earlyBirdEnding,
   renewalSoon, renewalExpired, renewalWinback,
 };
