@@ -1,5 +1,12 @@
 # 🚀 Launch Checklist — ย้ายไป OA จริง (Prinnie333, ~10,000 followers)
 
+> ✅ **LAUNCHED 11/07/2026 18:00** — TEST_MODE=false, broadcast ยิงแล้ว, rich menu default แล้ว
+> การเงินจริงใช้ **PromptPay QR + SlipOK ตรวจสลิปอัตโนมัติ** (Stripe/Beam ปฏิเสธหมวดดูดวง —
+> สเตป Stripe ข้างล่างเลิกใช้แล้ว) · ยอด ณ 14/07: สมาชิก 28, รายได้ ~8.4k
+> ⚠️ ค้างเปิด: `DAILY_TEASER_ENABLED` (teaser เช้าถึงคนยังไม่จ่าย — เช็คโควต้า push ของ
+> แพลน LINE OA ก่อนเปิด: ~750 คน/วัน ≈ 23k ข้อความ/เดือน), `RENEWAL_REMINDERS_ENABLED`,
+> `NUDGES_ENABLED` — checklist ด้านล่างเก็บไว้อ้างอิง/rollback
+
 > หลักการ: OA จริงยังมีพนักงานตอบแชทลูกค้าอยู่ + มี follower 10k ที่ห้ามโดน broadcast พลาด
 > → เปิดทีละสเตป, ใช้ `TEST_MODE` กันพลาด, ตั้ง rich menu แบบ per-user ก่อน แล้วค่อย default
 
