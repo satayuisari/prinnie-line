@@ -106,6 +106,18 @@ function aspectBlocks(aspects) {
   return lines;
 }
 
+// หัวข้อพลังดาว (ไม่รวมคำทำนาย) — ใช้ทำ teaser ล่อสมาชิก: โชว์ว่าดวงคำนวณแล้ว แต่ล็อกเนื้อหา
+function aspectHeadlines(aspects) {
+  return (aspects || []).map(a => {
+    const emoji = PLANET_EMOJI[a.aspecting_planet] || '🌟';
+    const name  = PLANET_TH[a.aspecting_planet] || a.aspecting_planet;
+    const rel   = a.aspected_planet
+      ? ` ${ASPECT_TH[a.aspect] || ''} ${PLANET_TH[a.aspected_planet] || a.aspected_planet}`.replace(/\s+/g, ' ').trimEnd()
+      : '';
+    return `${emoji} พลัง${name}${rel}`;
+  });
+}
+
 // ===== ดาวจร (transit) =====
 // แบ่งดาวตามความเร็ว → แต่ละช่วงใช้ "คนละชุด ไม่ทับกัน" (กันดวงแต่ละช่วงซ้ำกัน)
 //   รายวัน  = อาทิตย์/จันทร์ (จันทร์เปลี่ยนทุกวัน)
@@ -253,7 +265,87 @@ async function periodReading(period, chart, date = new Date()) {
   return { period, aspects, tarot, has_content: aspects.length > 0 || !!tarot };
 }
 
+// ===== ดวงรายวันแยกหัวข้อ (การงาน/ความรัก/การเงิน) — ไม่มีไพ่ (มีเมนูไพ่แยกแล้ว) =====
+// ใช้ดาวจรเร็ว (จันทร์/อาทิตย์ เปลี่ยนทุกวัน) แต่กรองเฉพาะมุมที่ไปแตะ "ดาวเรื่องนั้น" ในดวงเกิด
+//   → ได้ความหลากหลายรายวัน + เจาะเรื่องนั้นจริง (ต่างจากดวงรวม)
+// ดาวจรตามช่วงเวลา (เร็ว→ยาว) — รายวันใช้ดาวเร็ว, รายปีใช้ดาวนอก
+const PERIOD_TRANSIT = {
+  daily:   ['Sun', 'Moon', 'Mercury', 'Venus', 'Mars'],
+  weekly:  ['Mercury', 'Venus', 'Sun'],
+  monthly: ['Mars', 'Jupiter'],
+  annual:  ['Saturn', 'Neptune', 'Pluto'],
+};
+// จัดเรื่องตาม "ดาวจร" (ตัวกระตุ้น = ตัวกำหนดโทนคำทำนาย) + ดาวกำเนิด ต้องเข้าธีมทั้งคู่
+//   transit = ดาวจรที่ให้โทนตรงเรื่อง (กันงานไปโผล่ความรัก) · natal = จุดในดวงที่โดนกระตุ้น
+const TOPIC_CFG = {
+  love:  { transit: ['Venus', 'Moon', 'Neptune'],        natal: ['Venus', 'Moon', 'Sun', 'Mars', 'Neptune'],     label: 'ความรัก', emoji: '💖' },
+  work:  { transit: ['Mars', 'Mercury', 'Sun', 'Saturn', 'Moon'], natal: ['Mars', 'Mercury', 'Sun', 'Saturn', 'Jupiter'], label: 'การงาน', emoji: '💼' },
+  money: { transit: ['Jupiter', 'Venus', 'Saturn', 'Pluto', 'Moon'], natal: ['Jupiter', 'Venus', 'Saturn', 'Pluto', 'Sun'], label: 'การเงิน', emoji: '💰' },
+};
+// คำ "นอกเรื่อง" ของแต่ละหมวด → ถ้าเจอในคำทำนายให้ตัดทิ้งจากตรงนั้น (คำทำนายเป็นย่อหน้าเดียวยาว มักไหลออกนอกเรื่องช่วงท้าย)
+// ระวังคำสั้นที่ซ้อนในคำหมวดตัวเอง: ใช้ 'ทำงาน' ไม่ใช่ 'งาน' (ไม่งั้นไปโดน "แต่งงาน" ในหมวดความรัก)
+const TOPIC_OFF = {
+  love:  ['การเงิน', 'การลงทุน', 'ลงทุน', 'อาชีพ', 'การงาน', 'ทำงาน', 'ธุรกิจ', 'กำไร', 'เงินทอง', 'ผลงาน', 'หัวหน้า', 'เจ้านาย', 'เพื่อนร่วมงาน', 'ตำแหน่ง'],
+  work:  ['ความรัก', 'คนรัก', 'เนื้อคู่', 'โรแมนติก', 'เพศตรงข้าม', 'แต่งงาน', 'เสน่ห์', 'การเงิน', 'การลงทุน', 'ลงทุน', 'กำไร'],
+  money: ['ความรัก', 'คนรัก', 'เนื้อคู่', 'โรแมนติก', 'เพศตรงข้าม', 'แต่งงาน', 'ตำแหน่ง', 'เจ้านาย', 'หัวหน้า', 'เพื่อนร่วมงาน'],
+};
+// ตัดคำทำนายให้อยู่ในเรื่องเดียว: หยุดตรงคำนอกเรื่องแรก + จำกัดความยาว + เก็บกวาดคำเชื่อมห้อยท้าย
+// เปิดเรื่องมาก็นอกเรื่องแล้ว (เจอคำนอกเรื่องก่อน MIN) → คืน '' ให้ข้ามมุมนี้ไปเลย
+// ดีกว่าฝืนโชว์เนื้องานใต้หัวข้อความรัก (ปัญหาจริงที่เจอ 13-14/07)
+function focusTopicText(text, topic, maxLen = 320) {
+  const off = TOPIC_OFF[topic] || [];
+  const MIN = 90;                                  // เก็บลีดอย่างน้อยเท่านี้ก่อนยอมตัด
+  let cut = text.length;
+  for (const kw of off) {
+    const i = text.indexOf(kw);
+    if (i >= 0 && i < MIN) return '';              // ลีดนอกเรื่อง → ไม่ใช้กับหมวดนี้
+    if (i >= MIN && i < cut) cut = i;
+  }
+  let s = text.slice(0, cut).trim();
+  if (s.length > maxLen) {                          // ยังยาวไป → ตัดที่ช่องว่างก่อน maxLen
+    const sp = s.lastIndexOf(' ', maxLen);
+    s = s.slice(0, sp > MIN ? sp : maxLen).trim();
+  }
+  return s.replace(/[\s“"'(]*(รวมไปถึง|รวมทั้ง|และ|แต่|หรือ|อีกทั้ง|นอกจากนี้|ตลอดจน|ซึ่ง|โดย)\s*$/, '').trim();
+}
+// skip = เซ็ตของ key คู่ดาวที่ช่องก่อนหน้าใช้ไปแล้ว → กันเนื้อหาเดียวกันโผล่ซ้ำข้ามเรื่อง
+const aspectKey = a => `${a.aspecting_planet}-${a.aspect}-${a.aspected_planet}`;
+async function topicReading(topic, chart, date = new Date(), transitPlanets = PERIOD_TRANSIT.daily, skip = null) {
+  const cfg = TOPIC_CFG[topic] || TOPIC_CFG.love;
+  const transiting = transitingPositions(date);
+  let cand = transitAspects(transiting, chart.planets).filter(a =>
+    transitPlanets.includes(a.aspecting_planet) &&   // ดาวจรอยู่ในช่วงเวลานี้
+    cfg.transit.includes(a.aspecting_planet) &&      // ...และให้โทนตรงเรื่อง
+    cfg.natal.includes(a.aspected_planet) &&         // จุดกำเนิดที่โดนก็เข้าธีม
+    !(skip && skip.has(aspectKey(a))));              // ไม่ซ้ำกับเรื่องก่อนหน้า
+
+  // รายวัน: กันข้อความซ้ำข้ามวัน — มุมดาวช้า (พุธ/ศุกร์/อังคาร ออร์บค้างได้หลายวัน-หลายสัปดาห์)
+  // โชว์เฉพาะ "วันแรกที่มุมเข้า" เหมือน dailyReading (บั๊กจริง: การงาน 13-14/07 ขึ้นข้อความเดิมเป๊ะ)
+  // จันทร์เคลื่อน ~13°/วัน มุมอยู่ไม่ถึงวัน → ผ่านตัวกรองเสมอ = แหล่งความสดรายวัน
+  if (transitPlanets === PERIOD_TRANSIT.daily) {
+    const prevDate = new Date(date);
+    prevDate.setDate(prevDate.getDate() - 1);
+    const prevSet = new Set(transitAspects(transitingPositions(prevDate), chart.planets).map(aspectKey));
+    cand = cand.filter(a => !prevSet.has(aspectKey(a)));
+  }
+  cand.sort((a, b) => (b.exactness || 0) - (a.exactness || 0));   // มุมแม่นสุดขึ้นก่อน
+  const aspects = [];
+  for (const a of cand) {
+    const r = await db.query(
+      `SELECT prediction FROM horoscope_transit WHERE aspecting_planet=$1 AND aspect=$2 AND aspected_planet=$3`,
+      [a.aspecting_planet, a.aspect, a.aspected_planet]);
+    const raw  = r.rows[0] ? stripHtml(r.rows[0].prediction) : '';
+    const text = raw ? focusTopicText(raw, topic) : '';
+    if (text) {
+      aspects.push({ ...a, text });
+      if (skip) skip.add(aspectKey(a));
+      if (aspects.length >= 2) break;
+    }
+  }
+  return { topic, label: cfg.label, emoji: cfg.emoji, aspects, has_content: aspects.length > 0 };
+}
+
 module.exports = {
-  natalReading, dailyReading, periodReading, tarotByType,
-  stripHtml, aspectBlocks, classifyDayTheme, tarotHeading, THEME_TH,
+  natalReading, dailyReading, periodReading, topicReading, tarotByType, TOPIC_CFG, PERIOD_TRANSIT,
+  stripHtml, aspectBlocks, aspectHeadlines, classifyDayTheme, tarotHeading, THEME_TH,
 };

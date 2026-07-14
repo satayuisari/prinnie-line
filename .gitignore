@@ -18,3 +18,6 @@ content/raw/
 # skill ที่ unzip มา (อ้างอิงเฉย ๆ) — ไม่ commit ตัวเต็ม
 .skills-tmp/
 cowork/poc/cloudflared.exe
+
+# macOS junk
+.DS_Store
