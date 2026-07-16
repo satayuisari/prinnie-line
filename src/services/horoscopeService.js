@@ -320,16 +320,15 @@ function focusTopicText(text, topic, maxLen = 320) {
   if (TOPIC_ON[topic] && !TOPIC_ON[topic].test(s)) return '';
   return s;
 }
-// skip = เซ็ตของ key คู่ดาวที่ช่องก่อนหน้าใช้ไปแล้ว → กันเนื้อหาเดียวกันโผล่ซ้ำข้ามเรื่อง
+// skip = เซ็ตของ key คู่ดาวที่ช่องก่อนหน้าใช้ไปแล้ว → เรื่องถัดไปเลือกมุมอื่นก่อน (ถ้ามีให้เลือก)
 const aspectKey = a => `${a.aspecting_planet}-${a.aspect}-${a.aspected_planet}`;
 async function topicReading(topic, chart, date = new Date(), transitPlanets = PERIOD_TRANSIT.daily, skip = null) {
   const cfg = TOPIC_CFG[topic] || TOPIC_CFG.love;
   const transiting = transitingPositions(date);
-  let cand = transitAspects(transiting, chart.planets).filter(a =>
-    transitPlanets.includes(a.aspecting_planet) &&   // ดาวจรอยู่ในช่วงเวลานี้
-    cfg.transit.includes(a.aspecting_planet) &&      // ...และให้โทนตรงเรื่อง
-    cfg.natal.includes(a.aspected_planet) &&         // จุดกำเนิดที่โดนก็เข้าธีม
-    !(skip && skip.has(aspectKey(a))));              // ไม่ซ้ำกับเรื่องก่อนหน้า
+  // คลังใหม่ (horoscope_transit_topics) มีเนื้อแยกหมวดของ "ทุกคู่ดาว" → ทุกมุมเป็น candidate
+  // ของทุกหมวดได้ ไม่ต้องกรองดาวจรตามธีมอีก (มุมเดียวกันเล่าคนละเรื่องตามหมวดได้จริง)
+  let cand = transitAspects(transiting, chart.planets)
+    .filter(a => transitPlanets.includes(a.aspecting_planet));
 
   // รายวัน: กันข้อความซ้ำข้ามวัน — มุมดาวช้า (พุธ/ศุกร์/อังคาร ออร์บค้างได้หลายวัน-หลายสัปดาห์)
   // โชว์เฉพาะ "วันแรกที่มุมเข้า" เหมือน dailyReading (บั๊กจริง: การงาน 13-14/07 ขึ้นข้อความเดิมเป๊ะ)
@@ -340,18 +339,34 @@ async function topicReading(topic, chart, date = new Date(), transitPlanets = PE
     const prevSet = new Set(transitAspects(transitingPositions(prevDate), chart.planets).map(aspectKey));
     cand = cand.filter(a => !prevSet.has(aspectKey(a)));
   }
-  cand.sort((a, b) => (b.exactness || 0) - (a.exactness || 0));   // มุมแม่นสุดขึ้นก่อน
+  // ลำดับการเลือก: มุมที่ยังไม่ถูกเรื่องอื่นใช้ก่อน (สามหมวดได้คนละมุม อ่านหลากหลาย)
+  // → ดาวกำเนิดเข้าธีมเรื่องก่อน → มุมแม่นสุดก่อน / มุมที่ถูกใช้แล้วยังหยิบซ้ำได้
+  // เพราะเนื้อคนละหมวดเป็นคนละข้อความ (วันจันทร์ทำมุมเดียว ทั้งงาน/รัก/เงินก็ยังมีเนื้อครบ)
+  cand.sort((a, b) =>
+    ((skip && skip.has(aspectKey(a))) - (skip && skip.has(aspectKey(b)))) ||
+    (cfg.natal.includes(b.aspected_planet) - cfg.natal.includes(a.aspected_planet)) ||
+    ((b.exactness || 0) - (a.exactness || 0)));
+
   const aspects = [];
   for (const a of cand) {
-    const r = await db.query(
-      `SELECT prediction FROM horoscope_transit WHERE aspecting_planet=$1 AND aspect=$2 AND aspected_planet=$3`,
-      [a.aspecting_planet, a.aspect, a.aspected_planet]);
-    const raw  = r.rows[0] ? stripHtml(r.rows[0].prediction) : '';
-    const text = raw ? focusTopicText(raw, topic) : '';
+    // เนื้อแยกหมวดจากคลังใหม่ก่อน — เขียนมาเป็นเรื่องนั้นล้วน ๆ ไม่ต้องกรองคำ
+    const t = await db.query(
+      `SELECT prediction FROM horoscope_transit_topics
+       WHERE aspecting_planet=$1 AND aspect=$2 AND aspected_planet=$3 AND topic=$4`,
+      [a.aspecting_planet, a.aspect, a.aspected_planet, topic]);
+    let text = t.rows[0] ? t.rows[0].prediction : '';
+    if (!text) {
+      // fallback คลังเดิม (ย่อหน้ารวมทุกเรื่อง): ใช้ได้เฉพาะผ่าน gate คำในเรื่อง/นอกเรื่อง
+      const r = await db.query(
+        `SELECT prediction FROM horoscope_transit WHERE aspecting_planet=$1 AND aspect=$2 AND aspected_planet=$3`,
+        [a.aspecting_planet, a.aspect, a.aspected_planet]);
+      const raw = r.rows[0] ? stripHtml(r.rows[0].prediction) : '';
+      text = raw ? focusTopicText(raw, topic) : '';
+    }
     if (text) {
       aspects.push({ ...a, text });
       if (skip) skip.add(aspectKey(a));
-      if (aspects.length >= 2) break;
+      break;   // แสดงหมวดละเรื่องเดียว
     }
   }
   return { topic, label: cfg.label, emoji: cfg.emoji, aspects, has_content: aspects.length > 0 };

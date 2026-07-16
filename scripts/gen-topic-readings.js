@@ -156,13 +156,16 @@ async function poll() {
 
   const rows = await loadRows();
   const byKey = Object.fromEntries(rows.map(r => [key(r), r]));
+  // เฟส 1: ดูดผลทั้งหมดลง memory ให้จบก่อน — ห้ามแทรก DB insert ระหว่างอ่าน stream
+  // (insert ทีละแถวข้าม proxy ช้า → body stream ค้างจนโดนตัด 'terminated')
+  const results = [];
+  for await (const r of await client.messages.batches.results(id)) results.push(r);
+  console.log(`ดึงผลครบ ${results.length} รายการ — เริ่ม import`);
+
   const out = fs.createWriteStream(OUT_FILE);
   let ok = 0, failed = [];
-  const ins = `INSERT INTO horoscope_transit_topics (aspecting_planet, aspect, aspected_planet, topic, prediction, source, model)
-    VALUES ($1,$2,$3,$4,$5,$6,$7)
-    ON CONFLICT (aspecting_planet, aspect, aspected_planet, topic)
-    DO UPDATE SET prediction=EXCLUDED.prediction, source=EXCLUDED.source, model=EXCLUDED.model`;
-  for await (const result of await client.messages.batches.results(id)) {
+  const parsed = [];
+  for (const result of results) {
     const row = byKey[result.custom_id];
     if (!row || result.result.type !== 'succeeded') { failed.push(result.custom_id); continue; }
     const text = result.result.message.content.find(b => b.type === 'text')?.text || '';
@@ -175,13 +178,30 @@ async function poll() {
       if (p.length < 60 || p.length > 600 || !/[ก-๙]/.test(p)) { bad = true; break; }
     }
     if (bad) { failed.push(result.custom_id); continue; }
-    for (const t of ['love', 'work', 'money']) {
-      await db.query(ins, [row.aspecting_planet, row.aspect, row.aspected_planet, t, j[t].trim(), source, MODEL]);
-    }
+    parsed.push({ row, j, source });
     out.write(JSON.stringify({ key: result.custom_id, source, ...j }) + '\n');
-    ok++;
   }
   out.end();
+
+  // เฟส 2: insert เป็นชุด ชุดละ 50 คู่ (150 แถว/query) — เร็วพอไม่โดน proxy ตัด
+  for (let i = 0; i < parsed.length; i += 50) {
+    const chunk = parsed.slice(i, i + 50);
+    const values = [], params = [];
+    for (const { row, j, source } of chunk) {
+      for (const t of ['love', 'work', 'money']) {
+        const b = params.length;
+        values.push(`($${b + 1},$${b + 2},$${b + 3},$${b + 4},$${b + 5},$${b + 6},$${b + 7})`);
+        params.push(row.aspecting_planet, row.aspect, row.aspected_planet, t, j[t].trim(), source, MODEL);
+      }
+    }
+    await db.query(
+      `INSERT INTO horoscope_transit_topics (aspecting_planet, aspect, aspected_planet, topic, prediction, source, model)
+       VALUES ${values.join(',')}
+       ON CONFLICT (aspecting_planet, aspect, aspected_planet, topic)
+       DO UPDATE SET prediction=EXCLUDED.prediction, source=EXCLUDED.source, model=EXCLUDED.model`, params);
+    ok += chunk.length;
+    if (i % 200 === 0) console.log(`  … ${ok}/${parsed.length}`);
+  }
   console.log(`✓ import แล้ว ${ok} คู่ดาว (${ok * 3} คำทำนาย) → horoscope_transit_topics + ${OUT_FILE}`);
   if (failed.length) console.log(`⚠️ ล้มเหลว ${failed.length}: ${failed.slice(0, 10).join(', ')}${failed.length > 10 ? ' …' : ''}`);
   await db.end();
