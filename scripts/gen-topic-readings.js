@@ -13,7 +13,7 @@ const path = require('path');
 const Anthropic = require('@anthropic-ai/sdk');
 const db = require('../src/db');
 
-const MODEL = 'claude-opus-4-8';
+const MODEL = 'claude-fable-5';   // v2: อัพเกรดจาก claude-opus-4-8 — แม่นขึ้น สำนวนไม่ซ้ำ หมวดเด็ดขาด
 const ID_FILE = path.join(__dirname, '..', 'data', 'topic-batch-id');
 const OUT_FILE = path.join(__dirname, '..', 'data', 'topic-readings.jsonl');
 
@@ -59,6 +59,18 @@ const SYSTEM = `คุณคือนักโหราศาสตร์ขอ�
 - เขียนให้เป็นภาษาไทยธรรมชาติ ขึ้นต้นแต่ละหมวดไม่ซ้ำแพทเทิร์นกัน เลี่ยงสำนวลแปล เลี่ยงคำเชื่อมทางการ (อย่างไรก็ตาม ทั้งนี้ นอกจากนี้)
 - ความหมายทางโหราศาสตร์ต้องตรงกับธรรมชาติของมุม: มุมดีให้เรื่องดี มุมท้าทายให้ข้อควรระวังพร้อมคำแนะนำ
 - love = ความรัก ความสัมพันธ์ คนโสด/คนมีคู่ · work = งาน หน้าที่ เพื่อนร่วมงาน เจ้านาย · money = รายรับรายจ่าย การออม การลงทุน โชคลาภ
+
+ความแม่นยำ (สำคัญที่สุด):
+- เนื้อต้องเฉพาะเจาะจงกับคู่ดาวนี้จริง ๆ — คนที่รู้โหราศาสตร์อ่านแล้วต้องเดาได้ว่าเป็นมุมอะไร ห้ามเขียนกลาง ๆ ที่เอาไปสลับกับคู่ดาวไหนก็ได้
+- สะท้อนทั้งสองดาว: ดาวจรกำหนด "ลักษณะเหตุการณ์/แรงที่เข้ามา" ดาวกำเนิดกำหนด "ด้านชีวิตและนิสัยของเจ้าชะตาที่ถูกแตะ"
+- น้ำหนักตามมุม: กึ่งโยน/กึ่งฉาก = ผลอ่อน เหตุการณ์เล็ก ๆ · ฉาก/เล็ง = ชัดเจน จับต้องได้ · ตรีโกณ = ลื่นไหลเป็นธรรมชาติ · โยน = โอกาสที่ต้องคว้า · ร่วม = เข้มข้นที่สุด
+
+ความหลากหลาย (ห้ามซ้ำแพทเทิร์น):
+- ห้ามขึ้นต้นด้วย "ช่วงนี้" "เรื่องเงิน" "หัวใจของคุณ" "ความสัมพันธ์ของคุณ" "มุมมองเรื่องเงิน" — ให้ขึ้นต้นด้วยภาพ เหตุการณ์ หรือความรู้สึกที่เฉพาะกับพลังคู่ดาวนี้
+- ห้ามใช้วลีสำเร็จรูปเหล่านี้: "ลองเปิดใจ" "แล้วคุณจะ..." "จะกลายเป็นความมั่นคง" "เปิดกว้าง" "อย่าลืม..."
+- จังหวะประโยคของสามหมวดในคำตอบเดียวกันต้องต่างกัน (สั้นสลับยาว ขึ้นต้นคนละแบบ)
+
+ก่อนตอบ ตรวจตัวเองหนึ่งรอบ: ประโยคไหนหลุดไปแตะหมวดอื่น ให้ตัดหรือเขียนใหม่ให้อยู่ในหมวดตัวเอง
 
 ถ้ามี "คำทำนายต้นฉบับ" ให้ยึดความหมายและน้ำเสียงของต้นฉบับเป็นหลัก แล้วตีความแยกลงแต่ละหมวด ถ้าไม่มีให้เขียนจากความหมายดาวและมุมที่ให้`;
 
@@ -108,9 +120,9 @@ function buildRequest(row) {
     custom_id: key(row),
     params: {
       model: MODEL,
-      max_tokens: 2000,
+      max_tokens: 6000,   // fable: thinking เปิดตลอดและกินโควตา max_tokens ด้วย — เผื่อไว้
       system: [{ type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } }],
-      output_config: { format: OUTPUT_FORMAT },
+      output_config: { effort: 'medium', format: OUTPUT_FORMAT },
       messages: [{ role: 'user', content: userPrompt(row) }],
     },
   };
@@ -207,6 +219,55 @@ async function poll() {
   await db.end();
 }
 
+// ── retry: ซ่อมคู่ที่ยังไม่ได้เวอร์ชันโมเดลปัจจุบัน (batch โดน refusal/error) ──
+// Fable 5 มี safety classifier ที่ false positive กับดูดวงบางคู่ → ยิง sync ทีละคู่
+// ถ้า Fable ปฏิเสธ (stop_reason=refusal) ถอยไป claude-opus-4-8 ด้วย prompt เดิม
+async function retry() {
+  const client = new Anthropic();
+  const rows = await loadRows();
+  const have = new Set((await db.query(
+    `SELECT aspecting_planet||'__'||aspect||'__'||aspected_planet k
+     FROM horoscope_transit_topics WHERE model=$1 GROUP BY 1`, [MODEL])).rows.map(r => r.k));
+  const todo = rows.filter(r => !have.has(key(r)));
+  console.log(`ซ่อม ${todo.length} คู่ (sync, fallback → claude-opus-4-8 เมื่อโดน refusal)`);
+  const ins = `INSERT INTO horoscope_transit_topics (aspecting_planet, aspect, aspected_planet, topic, prediction, source, model)
+    VALUES ($1,$2,$3,$4,$5,$6,$7)
+    ON CONFLICT (aspecting_planet, aspect, aspected_planet, topic)
+    DO UPDATE SET prediction=EXCLUDED.prediction, source=EXCLUDED.source, model=EXCLUDED.model`;
+  let done = 0, viaFallback = 0, failed = [];
+  const worker = async () => {
+    while (todo.length) {
+      const row = todo.shift();
+      try {
+        const params = buildRequest(row).params;
+        let resp = await client.messages.create(params);
+        let servedBy = MODEL;
+        if (resp.stop_reason === 'refusal') {
+          resp = await client.messages.create({ ...params, model: 'claude-opus-4-8' });
+          servedBy = 'claude-opus-4-8';
+          if (resp.stop_reason === 'refusal') throw new Error('refused ทั้งสองโมเดล');
+          viaFallback++;
+        }
+        const j = JSON.parse(resp.content.find(b => b.type === 'text')?.text || '');
+        for (const t of ['love', 'work', 'money']) {
+          const p = (j[t] || '').trim();
+          if (p.length < 60 || p.length > 600 || !/[ก-๙]/.test(p)) throw new Error(`${t} ยาว ${p.length}`);
+        }
+        const source = stripHtml(row.prediction) ? 'rewritten' : 'generated';
+        for (const t of ['love', 'work', 'money']) {
+          await db.query(ins, [row.aspecting_planet, row.aspect, row.aspected_planet, t, j[t].trim(), source, servedBy]);
+        }
+        done++;
+        if (done % 20 === 0) console.log(`  … ${done} (fallback ${viaFallback})`);
+      } catch (e) { failed.push(`${key(row)}: ${e.message}`); }
+    }
+  };
+  await Promise.all([worker(), worker(), worker(), worker(), worker()]);
+  console.log(`✓ ซ่อมแล้ว ${done} คู่ (ใช้ opus fallback ${viaFallback})`);
+  if (failed.length) console.log(`⚠️ ยังตก ${failed.length}:\n  ` + failed.slice(0, 10).join('\n  '));
+  await db.end();
+}
+
 // ── sample: สุ่มอ่านจาก DB ────────────────────────────────────────────────────
 async function sample(n = 6) {
   const r = await db.query(
@@ -223,6 +284,6 @@ async function sample(n = 6) {
 }
 
 const cmd = process.argv[2];
-({ test, create, poll, sample: () => sample(parseInt(process.argv[3]) || 6) }[cmd] || (() => {
-  console.log('ใช้: test | create | poll | sample [N]'); process.exit(1);
+({ test, create, poll, retry, sample: () => sample(parseInt(process.argv[3]) || 6) }[cmd] || (() => {
+  console.log('ใช้: test | create | poll | retry | sample [N]'); process.exit(1);
 }))().catch(e => { console.error('ERR', e.message); process.exit(1); });
