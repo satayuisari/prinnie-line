@@ -249,13 +249,13 @@ async function handleEvent(event) {
           const free = await subscribers.claimFreeDaily(sub.line_user_id);
           return replyMessage(event.replyToken,
             await dailyTeaser.buildCombined('daily', sub.chart_data, sub.nickname, new Date(),
-              free ? { freeDay: true } : { locked: true }));
+              free ? { freeDay: true, userId: sub.line_user_id } : { locked: true, userId: sub.line_user_id }));
         } catch (_) { return replyMessage(event.replyToken, PAYWALL_PROMPT); }
       }
       // สัปดาห์/เดือน/ปี สำหรับคนยังไม่จ่าย → teaser ล็อก (แยกงาน/รัก/เงิน)
       try {
         return replyMessage(event.replyToken,
-          await dailyTeaser.buildCombined(action, sub.chart_data, sub.nickname, new Date(), { locked: true }));
+          await dailyTeaser.buildCombined(action, sub.chart_data, sub.nickname, new Date(), { locked: true, userId: sub.line_user_id }));
       } catch (_) { return replyMessage(event.replyToken, PAYWALL_PROMPT); }
     }
   }
@@ -264,13 +264,13 @@ async function handleEvent(event) {
     switch (action) {
       case 'daily': {
         if (!sub || !sub.chart_data) return replyMessage(event.replyToken, SIGNUP_PROMPT);
-        return replyMessage(event.replyToken, await dailyTeaser.buildCombinedDaily(sub.chart_data, sub.nickname));
+        return replyMessage(event.replyToken, await dailyTeaser.buildCombinedDaily(sub.chart_data, sub.nickname, new Date(), { userId: sub.line_user_id }));
       }
       case 'weekly':
       case 'monthly':
       case 'annual': {
         if (!sub || !sub.chart_data) return replyMessage(event.replyToken, SIGNUP_PROMPT);
-        return replyMessage(event.replyToken, await dailyTeaser.buildCombined(action, sub.chart_data, sub.nickname));
+        return replyMessage(event.replyToken, await dailyTeaser.buildCombined(action, sub.chart_data, sub.nickname, new Date(), { userId: sub.line_user_id }));
       }
       case 'natal': {
         if (!sub || !sub.chart_data) return replyMessage(event.replyToken, SIGNUP_PROMPT);
@@ -279,7 +279,8 @@ async function handleEvent(event) {
       }
       case 'tarot': {
         if (!sub || !sub.chart_data) return replyMessage(event.replyToken, SIGNUP_PROMPT);
-        const t = await horoscope.tarotByType('free');
+        // ไพ่ฉลาด: ใบเดียวกับที่ได้ใน push เช้าวันนั้น (จำต่องวด ไม่สุ่มใหม่ทุกครั้งที่กด)
+        const t = await horoscope.smartTarot({ userId: sub.line_user_id, period: 'daily', date: new Date() });
         if (!t) return replyMessage(event.replyToken, { type: 'text', text: 'ไม่มีไพ่ในขณะนี้' });
         const msgs = [];
         if (t.image) msgs.push({ type: 'image', originalContentUrl: t.image, previewImageUrl: t.image });

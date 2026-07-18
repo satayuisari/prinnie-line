@@ -49,7 +49,7 @@ async function sendDailyHoroscopes() {
 
   for (const m of members) {
     try {
-      const msgs = await dailyTeaser.buildCombinedDaily(m.chart_data, m.nickname, today);
+      const msgs = await dailyTeaser.buildCombinedDaily(m.chart_data, m.nickname, today, { userId: m.line_user_id });
       await lineMessaging.pushMessage(m.line_user_id, msgs);
       await saveLog(m.id, 'success');
       console.log(`  ✓  ${m.line_user_id} (${m.nickname})`);
@@ -69,7 +69,7 @@ async function sendDailyHoroscopes() {
       try {
         const free = await subscribers.claimFreeDaily(m.line_user_id);   // วันแรก = ฟรีเต็ม, หลังจากนั้น teaser
         const msgs = await dailyTeaser.buildCombinedDaily(m.chart_data, m.nickname, today,
-          free ? { freeDay: true } : { locked: true });
+          free ? { freeDay: true, userId: m.line_user_id } : { locked: true, userId: m.line_user_id });
         const res  = await lineMessaging.pushMessage(m.line_user_id, msgs);
         if (!res || !res.skipped) { await saveLog(m.id, 'success', null, free ? 'free-day' : 'teaser'); sent++; }
       } catch (err) {

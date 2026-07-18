@@ -115,26 +115,32 @@ function quietLine(period, topic, label, date) {
 }
 
 // ดวง "รวมทุกเรื่อง" อันเดียว รองรับทุกช่วง (daily/weekly/monthly/annual) — งาน/รัก/เงิน + ไพ่
-async function buildCombined(period, chart, nickname, date = new Date(), { locked = false, freeDay = false } = {}) {
+// opts.userId (line_user_id) ทำให้ไพ่จำประวัติ: งวดเดียวกันได้ใบเดิม + ไม่ซ้ำใบใน 21 วัน
+async function buildCombined(period, chart, nickname, date = new Date(), { locked = false, freeDay = false, userId = null } = {}) {
   const tp = horoscope.PERIOD_TRANSIT[period] || horoscope.PERIOD_TRANSIT.daily;
   // เรียงตามลำดับสิทธิ์ (รัก→งาน→เงิน) + skip ร่วม → คู่ดาวเดียวกันไม่โผล่ซ้ำข้ามเรื่อง
   const skip  = new Set();
   const love  = await horoscope.topicReading('love',  chart, date, tp, skip);
   const work  = await horoscope.topicReading('work',  chart, date, tp, skip);
   const money = await horoscope.topicReading('money', chart, date, tp, skip);
-  // ไพ่: รายวัน = ไพ่ธีมของวัน, ช่วงอื่น = ไพ่ประจำช่วง
-  let tarot, tarotHead;
-  if (period === 'daily') {
-    const d = await horoscope.dailyReading(chart, date);
-    tarot = d.tarot; tarotHead = d.theme ? horoscope.tarotHeading(d.theme) : '🃏 ไพ่ประจำวัน';
-  } else {
-    tarot = await horoscope.tarotByType(period);
-    tarotHead = `🃏 ไพ่ประจำ${TAROT_WORD[period] || ''}`;
+  // ไพ่ฉลาด: รายวันหยิบจากกองของหมวดที่มุมดาวแม่นสุดวันนั้น (ดวงไปทางเงิน → ไพ่การเงิน)
+  // ช่วงอื่นหยิบจากกองประจำช่วง — ทุกกองคือความหมายไพ่ของ อ.ปรินนี่ + จำประวัติไม่หยิบซ้ำ
+  let theme = null, best = -1;
+  for (const r of [love, work, money]) {
+    const ex = r.aspects[0] ? (r.aspects[0].exactness || 0) : -1;
+    if (r.aspects[0] && ex > best) { best = ex; theme = r.topic; }
   }
+  const tarot = await horoscope.smartTarot({ userId, period, date, theme: period === 'daily' ? theme : null });
+  const tarotHead = period === 'daily'
+    ? (tarot && tarot.theme ? horoscope.tarotHeading(tarot.theme) : '🃏 ไพ่ประจำวัน')
+    : `🃏 ไพ่ประจำ${TAROT_WORD[period] || ''}`;
+  // ประกาศพิเศษจาก อ.ปรินนี่ (เช่น ช่วงดาวพุธถอยหลัง) — เจาะตามลัคนา แสดงกับทุกคนรวมถึง teaser
+  const notes = period === 'daily' ? await horoscope.seasonalNotes(chart.rising, date) : [];
 
   const lines = [`✨ ${PERIOD_TITLE[period] || 'ดวง'}ของ ${nickname || 'คุณ'} 🌙`];
   if (period === 'daily') lines.push(`📅 ${date.toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'long' })}`);
   lines.push('');
+  for (const n of notes) lines.push(`📌 จาก อ.ปรินนี่: ${n}`, '');
   for (const r of [work, love, money]) {
     lines.push(`${r.emoji} ${r.label}`);
     if (r.aspects && r.aspects.length) {

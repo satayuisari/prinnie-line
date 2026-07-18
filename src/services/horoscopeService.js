@@ -349,10 +349,12 @@ async function topicReading(topic, chart, date = new Date(), transitPlanets = PE
 
   const aspects = [];
   for (const a of cand) {
-    // เนื้อแยกหมวดจากคลังใหม่ก่อน — เขียนมาเป็นเรื่องนั้นล้วน ๆ ไม่ต้องกรองคำ
+    // เนื้อแยกหมวดจากคลังใหม่ — ใช้เฉพาะ source='rewritten' (เรียบเรียงจากคำทำนายต้นฉบับ
+    // ของ อ.ปรินนี่เท่านั้น) ส่วน 'generated' (AI แต่งเอง) ถูกกันไว้จนกว่าอาจารย์จะรีวิว/ปรับเอง
     const t = await db.query(
       `SELECT prediction FROM horoscope_transit_topics
-       WHERE aspecting_planet=$1 AND aspect=$2 AND aspected_planet=$3 AND topic=$4`,
+       WHERE aspecting_planet=$1 AND aspect=$2 AND aspected_planet=$3 AND topic=$4
+         AND source='rewritten'`,
       [a.aspecting_planet, a.aspect, a.aspected_planet, topic]);
     let text = t.rows[0] ? t.rows[0].prediction : '';
     if (!text) {
@@ -372,7 +374,89 @@ async function topicReading(topic, chart, date = new Date(), transitPlanets = PE
   return { topic, label: cfg.label, emoji: cfg.emoji, aspects, has_content: aspects.length > 0 };
 }
 
+// ===== ไพ่ฉลาด v2 — หยิบตามดวงจริง + จำประวัติ ไม่สุ่มมั่ว =====
+// กองไพ่ของ อ.ปรินนี่: love 50 / work 33 / money 29 / weekly 21 / monthly 33 / annual 32 / free 21
+// กติกา: (1) งวดเดียวกันได้ใบเดิมเสมอ (กดดูซ้ำไม่เปลี่ยน) (2) ไม่หยิบใบที่คนนั้นเพิ่งได้ใน 21 วัน
+// (3) เลือกใบแบบ deterministic จาก hash(user+งวด) — ไม่ใช่ random()
+const crypto = require('crypto');
+function periodKey(period, date) {
+  const d = date.toISOString().slice(0, 10);
+  if (period === 'daily') return d;
+  if (period === 'monthly') return d.slice(0, 7);
+  if (period === 'annual') return d.slice(0, 4);
+  // ISO week
+  const t = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7));
+  const week = Math.ceil((((t - Date.UTC(t.getUTCFullYear(), 0, 1)) / 86400000) + 1) / 7);
+  return `${t.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
+}
+const hashInt = s => parseInt(crypto.createHash('sha1').update(s).digest('hex').slice(0, 8), 16);
+
+async function smartTarot({ userId = null, period = 'daily', date = new Date(), theme = null }) {
+  const key = periodKey(period, date);
+  // งวดนี้เคยหยิบแล้ว → เสิร์ฟใบเดิม
+  if (userId) {
+    const prev = await db.query(
+      `SELECT d.card_name, d.pool FROM tarot_draws d
+       WHERE d.line_user_id=$1 AND d.period=$2 AND d.period_key=$3`, [userId, period, key]);
+    if (prev.rows[0]) {
+      const r = await db.query(
+        `SELECT h.description, t.name, t.image_id FROM horoscope_tarot h
+         LEFT JOIN tarot t ON t.ext_id = h.tarot_card_map
+         WHERE h.type=$1 AND t.name=$2 LIMIT 1`, [prev.rows[0].pool, prev.rows[0].card_name]);
+      if (r.rows[0]) return toCard(r.rows[0], prev.rows[0].pool);
+    }
+  }
+  // กองที่หยิบ: รายวัน = ธีมของดวงวันนั้น (ไม่มีธีมเด่น → หมุน love/work/money ตามวัน+คน
+  // เพื่อให้ได้ความหมายของอาจารย์เสมอ ไม่ตกไปกอง free ที่มีแต่เมเจอร์ 21 ใบ)
+  let pool = period === 'daily'
+    ? (theme || ['love', 'work', 'money'][hashInt(`${userId || ''}|${key}`) % 3])
+    : period;
+  const rows = (await db.query(
+    `SELECT h.description, t.name, t.image_id FROM horoscope_tarot h
+     LEFT JOIN tarot t ON t.ext_id = h.tarot_card_map
+     WHERE h.type=$1 AND h.description<>'' AND t.name IS NOT NULL ORDER BY t.name`, [pool])).rows;
+  if (!rows.length) return null;
+  // ตัดใบที่เพิ่งได้ใน 21 วัน (ทุกงวดรวมกัน) — ถ้าตัดแล้วหมดกอง ค่อยยอมใช้ทั้งกอง
+  let eligible = rows;
+  if (userId) {
+    const recent = new Set((await db.query(
+      `SELECT card_name FROM tarot_draws WHERE line_user_id=$1 AND drawn_at > NOW() - INTERVAL '21 days'`,
+      [userId])).rows.map(r => r.card_name));
+    const fresh = rows.filter(r => !recent.has(r.name));
+    if (fresh.length) eligible = fresh;
+  }
+  const pick = eligible[hashInt(`${userId || ''}|${period}|${key}|${pool}`) % eligible.length];
+  if (userId) {
+    await db.query(
+      `INSERT INTO tarot_draws (line_user_id, period, period_key, card_name, pool)
+       VALUES ($1,$2,$3,$4,$5) ON CONFLICT (line_user_id, period, period_key) DO NOTHING`,
+      [userId, period, key, pick.name, pool]);
+  }
+  return toCard(pick, pool);
+}
+function toCard(row, pool) {
+  return {
+    name: row.name,
+    text: stripHtml(row.description),
+    image: row.image_id ? `https://data.prinnie333.com/assets/${row.image_id}` : null,
+    theme: ['love', 'work', 'money'].includes(pool) ? pool : null,
+  };
+}
+
+// ===== ประกาศพิเศษจาก อ.ปรินนี่ (seasonal_notes) — แทรกดวงรายวันตามลัคนา =====
+async function seasonalNotes(rising, date = new Date()) {
+  const d = date.toISOString().slice(0, 10);
+  const r = await db.query(
+    `SELECT message, lakkana FROM seasonal_notes
+     WHERE active AND start_date <= $1 AND end_date >= $1 ORDER BY id`, [d]);
+  return r.rows
+    .filter(n => n.lakkana === 'all' || (rising && n.lakkana.split(',').map(s => s.trim()).includes(rising)))
+    .map(n => n.message);
+}
+
 module.exports = {
   natalReading, dailyReading, periodReading, topicReading, tarotByType, TOPIC_CFG, PERIOD_TRANSIT,
   stripHtml, aspectBlocks, aspectHeadlines, classifyDayTheme, tarotHeading, THEME_TH,
+  smartTarot, seasonalNotes,
 };
