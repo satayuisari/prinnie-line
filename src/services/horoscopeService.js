@@ -84,6 +84,7 @@ const PLANET_EMOJI = {
 const PLANET_TH = {
   Sun: 'อาทิตย์', Moon: 'จันทร์', Mercury: 'พุธ', Venus: 'ศุกร์', Mars: 'อังคาร',
   Jupiter: 'พฤหัส', Saturn: 'เสาร์', Neptune: 'เนปจูน', Pluto: 'พลูโต',
+  Uranus: 'ยูเรนัส', Chiron: 'ไครอน', Node: 'ราหู',
 };
 const ASPECT_TH = {
   Conjunction: 'ร่วม', 'Semi-sextile': 'กึ่งโยน', 'Semi-Square': 'กึ่งฉาก',

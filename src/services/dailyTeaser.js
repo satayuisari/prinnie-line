@@ -84,53 +84,16 @@ const PERIOD_TITLE = { daily: 'ดวงวันนี้', weekly: 'ดวง�
 const PERIOD_WORD  = { daily: 'วันนี้', weekly: 'สัปดาห์นี้', monthly: 'เดือนนี้', annual: 'ปีนี้' };
 const TAROT_WORD   = { daily: 'วัน', weekly: 'สัปดาห์', monthly: 'เดือน', annual: 'ปี' };
 
-// วันที่เรื่องนั้นไม่มีมุมดาวเด่น — หมุนประโยคตามวัน ไม่ให้ขึ้น "ค่อนข้างนิ่ง" เดิมซ้ำทุกวัน
-// (หลังกันข้อความซ้ำข้ามวันแล้ว วันเงียบจะเจอบ่อยขึ้น) โทนแบรนด์: สบาย ๆ ให้กำลังใจ ไม่ดราม่า
-const QUIET_LINES = {
-  love: [
-    'ความรักวันนี้ไม่มีมุมดาวเด่น อยู่กับคนตรงหน้าแบบสบาย ๆ ก็ดีแล้วค่ะ',
-    'วันนี้เรื่องหัวใจราบเรียบ ไม่มีอะไรต้องลุ้น ใช้เวลากับตัวเองได้เต็มที่ค่ะ',
-    'ดาวความรักวันนี้พัก ความสัมพันธ์เดินตามปกติ ไม่มีเรื่องให้คิดมากค่ะ',
-    'วันนี้ความรักโทนเรียบ ๆ เหมาะกับดูแลใจตัวเองให้ชุ่มชื่นค่ะ',
-  ],
-  work: [
-    'การงานวันนี้ไม่มีมุมดาวกดดัน ทำตามจังหวะปกติได้สบาย ๆ ค่ะ',
-    'วันนี้งานราบเรียบ เหมาะกับเก็บงานค้างให้จบเป็นเรื่อง ๆ ค่ะ',
-    'ดาวการงานวันนี้นิ่ง เรื่องใหญ่พักไว้ก่อน ทำของตรงหน้าให้เรียบร้อยพอค่ะ',
-    'วันนี้การงานไม่มีอะไรต้องลุ้นเป็นพิเศษ ถือเป็นวันพักหายใจค่ะ',
-  ],
-  money: [
-    'การเงินวันนี้นิ่ง ไม่มีจังหวะพิเศษ ใช้จ่ายตามแผนเดิมได้เลยค่ะ',
-    'วันนี้เรื่องเงินราบเรียบ ไม่เข้าไม่ออกผิดปกติ เก็บออมตามจังหวะเดิมค่ะ',
-    'ดาวการเงินวันนี้พัก ยังไม่ใช่วันตัดสินใจเรื่องเงินก้อนใหญ่ค่ะ',
-    'วันนี้การเงินไม่มีมุมดาวเด่น ประคองกระเป๋าตามแผนเดิมสบาย ๆ ค่ะ',
-  ],
-};
-function quietLine(period, topic, label, date) {
-  if (period !== 'daily' || !QUIET_LINES[topic]) {
-    return `${PERIOD_WORD[period] || 'ช่วงนี้'}${label}ค่อนข้างนิ่ง ไม่มีจังหวะเด่นเป็นพิเศษ`;
-  }
-  const dayOfYear = Math.floor((date - new Date(date.getFullYear(), 0, 0)) / 86400000);
-  return QUIET_LINES[topic][dayOfYear % QUIET_LINES[topic].length];
-}
-
-// ดวง "รวมทุกเรื่อง" อันเดียว รองรับทุกช่วง (daily/weekly/monthly/annual) — งาน/รัก/เงิน + ไพ่
+// ดวงแบบดั้งเดิม prinnie333 — พลังดาว + คำทำนายต้นฉบับของ อ.ปรินนี่เต็ม ๆ (ไม่แยกหมวด)
+// รองรับทุกช่วง (daily/weekly/monthly/annual) + ไพ่ฉลาดจากกองความหมายของอาจารย์
 // opts.userId (line_user_id) ทำให้ไพ่จำประวัติ: งวดเดียวกันได้ใบเดิม + ไม่ซ้ำใบใน 21 วัน
 async function buildCombined(period, chart, nickname, date = new Date(), { locked = false, freeDay = false, userId = null } = {}) {
-  const tp = horoscope.PERIOD_TRANSIT[period] || horoscope.PERIOD_TRANSIT.daily;
-  // เรียงตามลำดับสิทธิ์ (รัก→งาน→เงิน) + skip ร่วม → คู่ดาวเดียวกันไม่โผล่ซ้ำข้ามเรื่อง
-  const skip  = new Set();
-  const love  = await horoscope.topicReading('love',  chart, date, tp, skip);
-  const work  = await horoscope.topicReading('work',  chart, date, tp, skip);
-  const money = await horoscope.topicReading('money', chart, date, tp, skip);
-  // ไพ่ฉลาด: รายวันหยิบจากกองของหมวดที่มุมดาวแม่นสุดวันนั้น (ดวงไปทางเงิน → ไพ่การเงิน)
-  // ช่วงอื่นหยิบจากกองประจำช่วง — ทุกกองคือความหมายไพ่ของ อ.ปรินนี่ + จำประวัติไม่หยิบซ้ำ
-  let theme = null, best = -1;
-  for (const r of [love, work, money]) {
-    const ex = r.aspects[0] ? (r.aspects[0].exactness || 0) : -1;
-    if (r.aspects[0] && ex > best) { best = ex; theme = r.topic; }
-  }
-  const tarot = await horoscope.smartTarot({ userId, period, date, theme: period === 'daily' ? theme : null });
+  // dailyReading มีตัวกรอง "มุมที่เพิ่งเข้าใหม่วันนี้" กันข้อความซ้ำข้ามวันอยู่แล้ว
+  const reading = period === 'daily'
+    ? await horoscope.dailyReading(chart, date)
+    : await horoscope.periodReading(period, chart, date);
+  // ไพ่ฉลาด: รายวันหยิบตามธีมดาวเด่นของวัน (ดวงไปทางเงิน → กองไพ่การเงินของอาจารย์)
+  const tarot = await horoscope.smartTarot({ userId, period, date, theme: period === 'daily' ? (reading.theme || null) : null });
   const tarotHead = period === 'daily'
     ? (tarot && tarot.theme ? horoscope.tarotHeading(tarot.theme) : '🃏 ไพ่ประจำวัน')
     : `🃏 ไพ่ประจำ${TAROT_WORD[period] || ''}`;
@@ -141,16 +104,17 @@ async function buildCombined(period, chart, nickname, date = new Date(), { locke
   if (period === 'daily') lines.push(`📅 ${date.toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'long' })}`);
   lines.push('');
   for (const n of notes) lines.push(`📌 จาก อ.ปรินนี่: ${n}`, '');
-  for (const r of [work, love, money]) {
-    lines.push(`${r.emoji} ${r.label}`);
-    if (r.aspects && r.aspects.length) {
-      // ตัดศัพท์โหราออก (เช่น "พลังดาวอังคาร กากบาท ดาวพุธ") → เหลือคำทำนายภาษาคนอ่านง่าย
-      if (locked) lines.push('🔒 มีจังหวะสำคัญของคุณรออยู่ ปลดล็อกอ่านเต็มได้เลย');
-      else lines.push(r.aspects[0].text);
+
+  const aspects = reading.aspects || [];
+  const word = PERIOD_WORD[period] || 'ช่วงนี้';
+  if (aspects.length) {
+    if (locked) {
+      lines.push(`🌟 ${word}ดวงดาวส่งพลังถึงคุณ:`, ...horoscope.aspectHeadlines(aspects).map(h => `${h}   🔒`), '');
     } else {
-      lines.push(quietLine(period, r.topic, r.label, date));
+      lines.push(`🌟 พลังดาวที่ส่งถึงคุณ${word}`, '', ...horoscope.aspectBlocks(aspects), '');
     }
-    lines.push('');
+  } else {
+    lines.push(`🌙 ${word}ดวงดาวของคุณนิ่งสงบ ขอให้ไพ่ใบนี้เป็นเพื่อนนำทางคุณนะคะ ✨`, '');
   }
   lines.push('━━━━━━━━━━━━');
   if (tarot) {
