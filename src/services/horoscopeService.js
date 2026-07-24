@@ -156,6 +156,9 @@ async function transitReading(chart, date, planetFilter, limit = 3) {
 // วันนี้ดาวเด่นไปทางไหน → ดึงไพ่หมวดนั้น (การงาน/การเงิน/ความรัก)
 // เรามีไพ่แยกหมวดใน horoscope_tarot.type: work / money / love (นอกจาก free/weekly/monthly/annual)
 // แต่ละดาวมี "พลังประจำตัว" → รวมคะแนนจากดาวที่ทำมุมวันนี้ แล้วเลือกหมวดที่แรงสุด
+// ครอบคลุมทั้งดาวเร็ว (อาทิตย์/จันทร์/พุธ/ศุกร์/อังคาร) และดาวโชคลาภ/วินัย (พฤหัส/เสาร์)
+// ให้ทั้งสามธีมมีดาวโหวตพอกัน — ถ้าใช้แค่ดาวเร็วอย่างเดียว งาน/เงินจะแทบไม่มีดาวเป็นตัวแทนเลย
+const THEME_PLANETS = ['Sun', 'Moon', 'Mercury', 'Venus', 'Mars', 'Jupiter', 'Saturn'];
 const PLANET_THEME = {
   Venus:   { love: 1.0, money: 0.5 },   // ศุกร์ = ความรัก/เสน่ห์/เงินทอง
   Moon:    { love: 0.6 },               // จันทร์ = อารมณ์/ความสัมพันธ์
@@ -215,12 +218,17 @@ function aspectSig(aspects) {
 async function dailyReading(chart, date = new Date()) {
   const aspects = await transitReading(chart, date, DAILY_PLANETS, 3);
 
-  // 🃏 ไพ่ฉลาด: ดูว่าดาวที่ทำมุมวันนี้เอนไปทางใด (การงาน/การเงิน/ความรัก) → ดึงไพ่หมวดนั้น
-  // ใช้ "มุมทั้งหมด" ของดาวรายวัน (ไม่กรองเฉพาะที่มีคำทำนาย) เพื่อจับธีมจริงของท้องฟ้า
+  // 🃏 ไพ่ฉลาด: หามุมดาว "เด่นที่สุด" ของวัน (ออร์บแม่นสุด) แล้วดูว่าเอนไปทางไหน (งาน/เงิน/รัก)
+  // ใช้ดาวจรกลุ่มกว้าง (อาทิตย์/จันทร์/พุธ/ศุกร์/อังคาร/พฤหัส/เสาร์) ครอบคลุมทั้ง 3 ธีม
+  // เดิมกรองแค่ DAILY_PLANETS (อาทิตย์/จันทร์) + รวมคะแนนทุกมุมของวัน → PLANET_THEME ให้
+  // น้ำหนักจันทร์ทางความรักอย่างเดียว ธีมเลยออกความรักเกือบทุกวัน (บั๊กที่เจอ 22/07)
+  // แก้เป็นดูเฉพาะ "มุมเดียวที่เด่นสุด" — ไม่งั้นรวมคะแนนทั้งวันจะเอียงไปหาธีมที่มีดาวโหวตเยอะกว่า
+  // (เช่น งานมีอังคาร+พุธ+เสาร์โหวต ในขณะรักมีแค่ศุกร์+จันทร์ → งานจะชนะเกือบตลอดถ้ารวมคะแนน)
   const transiting = transitingPositions(date);
   const rawDaily   = transitAspects(transiting, chart.planets)
-    .filter(a => DAILY_PLANETS.includes(a.aspecting_planet));
-  const theme = classifyDayTheme(rawDaily);
+    .filter(a => THEME_PLANETS.includes(a.aspecting_planet))
+    .sort((a, b) => (b.exactness || 0) - (a.exactness || 0));
+  const theme = rawDaily.length ? classifyDayTheme([rawDaily[0]]) : null;
   const tarot = await tarotByType(theme || 'free') || await tarotByType('free');
   if (tarot) tarot.theme = theme;   // ให้ formatter ติดป้าย "ไพ่การเงินประจำวัน" ฯลฯ
 

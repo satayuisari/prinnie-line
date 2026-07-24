@@ -1,11 +1,9 @@
 // Renewal-reminder scheduler — กันรูรั่ว churn
 // subscription เป็นจ่ายครั้งเดียว +30 วัน (ไม่ recurring) → พอ subscribe_end ผ่าน ดวงหยุดส่งเงียบ ๆ
-// ตัวนี้ push เตือน "รายคน" ให้สมาชิกที่เคยจ่ายแล้ว ใกล้/เลยวันหมดอายุ ให้กลับมาต่ออายุ
+// ตัวนี้ push เตือน "รายคน" ให้สมาชิกที่เคยจ่ายแล้ว ก่อนหมดอายุ ให้ต่ออายุทัน
 //
-// ลำดับ (1 ข้อความต่อ phase, รีเซ็ตเองทุกครั้งที่ต่ออายุ):
-//   stage 1  T-3..T-1 วัน  → เตือนล่วงหน้า ดวงกำลังจะหยุด
-//   stage 2  T-0..T+1 วัน  → แจ้งหมดอายุแล้ว
-//   stage 3  ตั้งแต่ T+3   → win-back ดึงกลับครั้งสุดท้ายของรอบ
+// เตือนครั้งเดียวต่อรอบ (ตามที่เจ้าของสั่ง 22/07): เหลืออายุสมาชิก 1 วัน → ส่ง 1 ข้อความ จบ
+// ไม่มี stage หมดอายุแล้ว/win-back อีก — ถ้าไม่ต่อ ก็แค่หยุดส่งดวงเงียบ ๆ ตามปกติ
 //
 // ความปลอดภัย:
 //   - ปิดโดยดีฟอลต์: ต้องตั้ง RENEWAL_REMINDERS_ENABLED=true ถึงจะส่ง
@@ -19,7 +17,6 @@
 const cron    = require('node-cron');
 const db      = require('../db');
 const lineMsg = require('../services/lineMessaging');
-const flex    = require('../marketing/flexTemplates');
 
 const LIFF_URL = process.env.LINE_LIFF_ID
   ? `https://liff.line.me/${process.env.LINE_LIFF_ID}`
@@ -33,21 +30,14 @@ function expireText(end) {
   } catch { return ''; }
 }
 
-// daysToExpiry → stage ที่ "ควรถึง" แล้ว (เลือก phase ปัจจุบัน ส่ง 1 ข้อความ ไม่สแปมย้อนหลัง)
+// daysToExpiry → stage เดียว: เหลือ ≤1 วัน (รวมถึงเพิ่งหมดไปไม่เกิน 1 วัน กันพลาดรอบ cron)
+// ส่งครั้งเดียวต่อรอบ — anchor-reset ด้านล่างจัดการให้เตือนซ้ำได้เองเมื่อต่ออายุรอบใหม่
 function eligibleStage(daysToExpiry) {
-  if (daysToExpiry <= -3) return 3; // win-back
-  if (daysToExpiry <= 1)  return 2; // วันหมด/เพิ่งหมด (รวม T-0 ถึง T+1)
-  if (daysToExpiry <= 3)  return 1; // ก่อนหมด
-  return 0;
+  return daysToExpiry <= 1 ? 1 : 0;
 }
 
-function buildMessage(stage, sub, daysToExpiry) {
-  if (stage === 1) {
-    const daysLeft = Math.max(1, Math.ceil(daysToExpiry));
-    return flex.renewalSoon(LIFF_URL, daysLeft, expireText(sub.subscribe_end));
-  }
-  if (stage === 2) return flex.renewalExpired(LIFF_URL);
-  return flex.renewalWinback(LIFF_URL);
+function buildMessage() {
+  return { type: 'text', text: 'ใกล้จะหมดเวลาแล้ว อย่าลืมสมัครต่อรายเดือนนะคะ 🌙\n\n👉 ' + LIFF_URL };
 }
 
 async function runRenewals(now = new Date()) {
@@ -94,15 +84,13 @@ async function runRenewals(now = new Date()) {
     }
 
     try {
-      const message = buildMessage(want, sub, daysToExpiry);
+      const message = buildMessage();
       const res = await lineMsg.pushMessage(sub.line_user_id, [message]);
       if (res && res.skipped) continue; // TEST_MODE บล็อก → ไม่ขยับ stage ไว้ส่งตอน live
 
-      // win-back แล้วถือว่าหมดรอบ → ตั้ง status=EXPIRED ให้ dashboard ตรงความจริง
-      const setExpired = want >= 2 ? ", status = 'EXPIRED'" : '';
       await db.query(
         `UPDATE line_subscribers
-            SET renewal_stage = $1, renewal_anchor = $2, updated_at = NOW()${setExpired}
+            SET renewal_stage = $1, renewal_anchor = $2, updated_at = NOW()
           WHERE id = $3`,
         [want, sub.subscribe_end, sub.id]
       );
