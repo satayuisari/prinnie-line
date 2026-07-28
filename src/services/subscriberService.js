@@ -173,9 +173,10 @@ async function claimFreeDaily(line_user_id) {
 }
 
 // คนที่ "ลงทะเบียนแล้วแต่ยังไม่จ่าย" (มีดวง แต่ไม่ active) — เป้าหมาย teaser 8 โมงเช้า
+// คืน free_daily_at ด้วย เพื่อให้ scheduler คุมจังหวะ (กัน fatigue จากการยิงทุกวัน)
 async function getRegisteredInactive() {
   const r = await db.query(
-    `SELECT id, line_user_id, nickname, chart_data
+    `SELECT id, line_user_id, nickname, chart_data, free_daily_at
      FROM line_subscribers
      WHERE chart_data IS NOT NULL
        AND (subscribe_end IS NULL OR subscribe_end <= NOW())

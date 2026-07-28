@@ -61,11 +61,14 @@ async function sendDailyHoroscopes() {
   console.log('[Scheduler] Done.');
 
   // ── Teaser 8 โมงเช้า: ส่ง "ดวงล็อก" ให้คนลงทะเบียนแต่ยังไม่จ่าย → ล่อสมัคร ──
+  // กัน fatigue: ไม่ยิงคนเดิมทุกวันตลอดไป — ยิงหนักช่วงร้อน (3 วันแรกหลังชิมฟรี)
+  // แล้วเหลือสัปดาห์ละครั้ง เพื่อคงความอุ่นไว้โดยไม่ทำให้รำคาญจนบล็อก
   if (process.env.DAILY_TEASER_ENABLED === 'true') {
     const leads = await subscribers.getRegisteredInactive();
-    console.log(`[Teaser] ${leads.length} คนลงทะเบียนแต่ยังไม่จ่าย → ส่ง teaser`);
+    const due = leads.filter(m => shouldTeaseToday(m.free_daily_at, today));
+    console.log(`[Teaser] lead ${leads.length} คน → เข้าเกณฑ์ส่งวันนี้ ${due.length} คน (กัน fatigue)`);
     let sent = 0;
-    for (const m of leads) {
+    for (const m of due) {
       try {
         const free = await subscribers.claimFreeDaily(m.line_user_id);   // วันแรก = ฟรีเต็ม, หลังจากนั้น teaser
         const msgs = await dailyTeaser.buildCombinedDaily(m.chart_data, m.nickname, today,
@@ -77,8 +80,19 @@ async function sendDailyHoroscopes() {
         await saveLog(m.id, 'failed', err.message, 'teaser').catch(() => {});
       }
     }
-    console.log(`[Teaser] Done — ส่งได้ ${sent}/${leads.length}`);
+    console.log(`[Teaser] Done — ส่งได้ ${sent}/${due.length}`);
   }
+}
+
+// จังหวะ teaser ต่อ lead (กัน fatigue จากการยิงทุกวัน):
+//   - ยังไม่เคยชิมฟรี → ยิง (จะได้ freeDay วันแรก)
+//   - หลังชิมฟรี 1-3 วัน → ยิงทุกวัน (ช่วงร้อน เพิ่งเห็นของดี ยอมจ่ายง่ายสุด)
+//   - หลังจากนั้น → สัปดาห์ละครั้ง (ทุกวันที่ 7 นับจากวันชิมฟรี) คงความอุ่นไว้ไม่ให้เผา
+function shouldTeaseToday(freeDailyAt, today = new Date()) {
+  if (!freeDailyAt) return true;
+  const days = Math.floor((today - new Date(freeDailyAt)) / 86400000);
+  if (days <= 3) return true;
+  return days % 7 === 0;
 }
 
 function start() {
@@ -86,4 +100,4 @@ function start() {
   console.log('[Scheduler] Daily horoscope — 08:00 Bangkok time');
 }
 
-module.exports = { start, sendDailyHoroscopes };
+module.exports = { start, sendDailyHoroscopes, shouldTeaseToday };
