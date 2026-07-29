@@ -11,6 +11,7 @@ const paymentRoutes = require('./routes/payment');
 const webhook       = require('./routes/webhook');
 const beamWebhook   = require('./routes/beamWebhook');
 const dashboard     = require('./routes/dashboard');
+const goRedirect    = require('./routes/go');
 const scheduler     = require('./scheduler/dailyHoroscope');
 const nudges        = require('./scheduler/nudges');
 const renewals      = require('./scheduler/renewals');
@@ -55,6 +56,7 @@ app.use('/api/payment', apiLimiter, paymentRoutes);
 
 app.use('/dashboard', dashLimiter);
 dashboard.register(app);   // /dashboard?key=DASHBOARD_KEY
+goRedirect.register(app);  // /go?s=yt → นับคลิกแยกช่องทาง → แอดเพื่อน LINE
 app.get('/health', (_, res) => res.json({ ok: true }));
 
 scheduler.start();

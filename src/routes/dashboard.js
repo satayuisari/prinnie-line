@@ -12,6 +12,7 @@ const paymentApprove = require('../services/paymentApprove');
 
 const PRICE = 399;
 const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const SRC_LABEL = { yt: '▶️ YouTube', tt: '🎵 TikTok', fb: '📘 Facebook', ig: '📸 Instagram', direct: '🔗 ตรง/อื่นๆ' };
 const ok = (req) => process.env.DASHBOARD_KEY && req.query.key === process.env.DASHBOARD_KEY;
 
 async function getStats() {
@@ -34,7 +35,12 @@ async function getStats() {
   const recent = (await db.query(`
     SELECT display_name, nickname, status, to_char(created_at,'MM-DD HH24:MI') AS created
     FROM line_subscribers ORDER BY created_at DESC LIMIT 10`)).rows;
-  return { s, recent };
+  // คลิกลิงก์แยกช่องทาง 7 วันหลัง (วัดว่า YouTube/TikTok/FB พาคนมาไหม)
+  const channels = (await db.query(`
+    SELECT source, SUM(clicks)::int AS clicks
+    FROM channel_clicks WHERE click_date >= CURRENT_DATE - 6
+    GROUP BY source ORDER BY clicks DESC LIMIT 8`).catch(() => ({ rows: [] }))).rows;
+  return { s, recent, channels };
 }
 
 function card(label, value, sub, accent) {
@@ -82,7 +88,7 @@ function payCard(o, key) {
     </div></div>`;
 }
 
-function render({ s, recent }, msgs, pays, aiOn, key) {
+function render({ s, recent, channels = [] }, msgs, pays, aiOn, key) {
   const mrr = (s.paying * PRICE).toLocaleString();   // นับเฉพาะลูกค้าจ่ายจริง (ตัด tester/free/admin)
   // funnel: ผู้ติดตาม → ลงทะเบียนดวง → สมาชิกจ่ายเงิน
   const regRate = s.total ? Math.round(s.registered / s.total * 100) : 0;       // แอด → ลงทะเบียน (จุดที่อุด 966→14)
@@ -157,6 +163,11 @@ function render({ s, recent }, msgs, pays, aiOn, key) {
       ${card('⚠️ ใกล้หมด (7วัน)', s.expiring_soon, '', s.expiring_soon ? '#F0A868' : undefined)}
       ${card('🗂️ EXPIRED/ยกเลิก', s.expired + s.cancelled, `EXP ${s.expired}·CAN ${s.cancelled}`)}
     </div>
+    <div class="sec">คลิกลิงก์แยกช่องทาง (7 วัน) — /go?s=yt,tt,fb,ig</div>
+    ${channels.length
+      ? `<table><tbody>${channels.map(c => `<tr><td>${esc(SRC_LABEL[c.source] || c.source)}</td>
+          <td style="text-align:right"><b>${c.clicks}</b> คลิก</td></tr>`).join('')}</tbody></table>`
+      : '<div class="muted" style="padding:12px">ยังไม่มีคลิก — เอาลิงก์ /go?s=yt ไปโพสต์ YouTube/TikTok แล้วดูที่นี่</div>'}
     <div class="sec">รายชื่อสมัครล่าสุด</div>
     <table><tbody>${rows || '<tr><td class="muted">ยังไม่มีสมาชิก</td></tr>'}</tbody></table>
   </div>
