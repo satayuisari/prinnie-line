@@ -97,7 +97,19 @@ async function pushOA2(lineUserId, messages) {
   return c.pushMessage({ to: lineUserId, messages: Array.isArray(messages) ? messages : [messages] });
 }
 
+// แจ้งเตือนแอดมิน (Bon/prinprin) เวลามีปัญหาที่ต้องคนดู — สลิปตรวจไม่ผ่าน, ลูกค้าติดปัญหา ฯลฯ
+// ส่งตรงเสมอ (ข้าม TEST_MODE allowlist) เพราะ admin id อยู่ใน allowlist อยู่แล้ว + เป็น internal
+const ADMIN_IDS = (process.env.ADMIN_USER_IDS ||
+  'Ub358215999e4bede8773435eb812695a,Ue72dc1cca95a648065ff0dc3390253a6')
+  .split(',').map(s => s.trim()).filter(Boolean);
+async function notifyAdmins(text) {
+  for (const uid of ADMIN_IDS) {
+    await client.pushMessage({ to: uid, messages: [{ type: 'text', text }] })
+      .catch(e => console.error('[notifyAdmins]', uid, e.message));
+  }
+}
+
 module.exports = {
   client, blobClient, getMessageContent, pushMessage, pushText, replyMessage, broadcast, isAllowed, TEST_MODE,
-  oa2Enabled, oa2AccessToken, oa2Client, broadcastOA2, pushOA2,
+  oa2Enabled, oa2AccessToken, oa2Client, broadcastOA2, pushOA2, notifyAdmins,
 };

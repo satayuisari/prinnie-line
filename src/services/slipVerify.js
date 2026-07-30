@@ -9,10 +9,25 @@ function isEnabled() {
 }
 
 // ถอดรหัส QR ในรูปสลิป → คืน string ข้อมูล (ให้ SlipOK ยืนยันจาก data)
-async function readSlipQR(imageBuffer) {
-  const { data, info } = await sharp(imageBuffer).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+// jsQR อ่านพลาดบ่อยกับสลิปจริง (QR เล็ก/เบลอ/สกรีนช็อตย่อ) → ต้นตอ auto-check ไม่ผ่าน ~29%
+// ลองหลายวิธี: ขนาดเดิม → ขยาย 2 เท่า → เพิ่มคอนทราสต์ขาวดำ ก่อนยอมแพ้ (เพิ่มอัตราอ่านสำเร็จ)
+async function decodeAt(pipeline) {
+  const { data, info } = await pipeline.ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   const code = jsQR(new Uint8ClampedArray(data), info.width, info.height);
   return code ? code.data : null;
+}
+async function readSlipQR(imageBuffer) {
+  const meta = await sharp(imageBuffer).metadata().catch(() => ({}));
+  const w = meta.width || 0;
+  const attempts = [
+    sharp(imageBuffer),                                              // ต้นฉบับ
+    sharp(imageBuffer).resize({ width: Math.max(w * 2, 1200) }),     // ขยายให้ QR ใหญ่ขึ้น
+    sharp(imageBuffer).resize({ width: Math.max(w * 2, 1200) }).grayscale().normalise(),  // ขาวดำ+ยืดคอนทราสต์
+  ];
+  for (const p of attempts) {
+    try { const s = await decodeAt(p); if (s) return s; } catch (_) { /* ลองอันถัดไป */ }
+  }
+  return null;
 }
 
 // ตรวจสลิปผ่าน SlipOK ด้วย "data" (ข้อมูล QR) — คืน { ok, amount, ref, dup, reason }

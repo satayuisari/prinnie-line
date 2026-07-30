@@ -1,7 +1,7 @@
 const line        = require('@line/bot-sdk');
 const subscribers = require('../services/subscriberService');
 const horoscope   = require('../services/horoscopeService');
-const { replyMessage, isAllowed, TEST_MODE, client, getMessageContent } = require('../services/lineMessaging');
+const { replyMessage, isAllowed, TEST_MODE, client, getMessageContent, notifyAdmins } = require('../services/lineMessaging');
 const slipVerify     = require('../services/slipVerify');
 const paymentApprove = require('../services/paymentApprove');
 const dailyTeaser    = require('../services/dailyTeaser');
@@ -144,26 +144,43 @@ async function handleEvent(event) {
   // มีออเดอร์ค้าง → ตอบรับสลิป (staff อนุมัติบน dashboard). ไม่มี → รูปทั่วไป เงียบไว้ให้ staff ดูแล
   if (event.type === 'message' && event.message.type === 'image') {
     const order = await paymentOrders.attachSlip(event.source.userId, event.message.id).catch(() => null);
-    if (!order) return;   // ไม่มีออเดอร์ค้าง = รูปทั่วไป เงียบ
+    if (!order) {
+      // รูปแต่ไม่มีออเดอร์ค้าง — อาจเป็นรูปทั่วไป หรือ "โอนแล้วแต่ไม่เคยกดสมัคร/ออเดอร์หมดอายุ"
+      // เดาว่าเป็นสลิปถ้าเป็นคนที่ยังไม่ active (คนจ่ายแล้วไม่ส่งรูปสุ่ม) → เตือนแอดมินไว้เช็ก
+      const sub = await subscribers.getByLineUserId(event.source.userId).catch(() => null);
+      const active = sub && sub.subscribe_end && new Date(sub.subscribe_end) > new Date();
+      if (sub && !active) {
+        const name = await lineClient_safeProfile(event.source.userId).catch(() => '');
+        notifyAdmins(`🧾 มีคนส่งรูป(น่าจะสลิป)แต่ไม่มีออเดอร์ค้าง\nชื่อ: ${name || '-'}\nid: ${event.source.userId}\nอาจโอนโดยไม่ได้กดสมัคร/ออเดอร์หมดอายุ — เข้า dashboard เช็กแล้วเปิดให้มือได้ค่ะ`).catch(() => {});
+        return replyMessage(event.replyToken, { type: 'text', text:
+          'ได้รับรูปแล้วนะคะ ✨ ถ้าเป็นสลิปการโอน ทีมงานจะตรวจสอบและเปิดใช้งานให้เร็วที่สุดค่ะ 🙏\nหากยังไม่ได้กดสมัคร รบกวนกดเมนู "สมัครสมาชิก" อีกครั้งนะคะ' });
+      }
+      return;   // รูปทั่วไปของคน active/ไม่รู้จัก = เงียบ
+    }
     const what = order.type === 'couple' ? 'ปลดล็อกดวงคู่' : 'เปิดใช้งานสมาชิก';
+    const amount = order.amount / 100;
 
     // ✅ ตรวจสลิปอัตโนมัติด้วย SlipOK → เงินเข้าจริง + ยอดถูก = เปิดใช้งานทันที ไม่ต้องรอ staff
     if (slipVerify.isEnabled()) {
-      const expected = order.amount / 100;
       const buf = await getMessageContent(event.message.id);
-      const v = buf ? await slipVerify.verify(buf, expected) : { ok: false, reason: 'ดึงรูปสลิปไม่ได้' };
-      if (v.ok && Math.abs(v.amount - expected) < 1) {
+      const v = buf ? await slipVerify.verify(buf, amount) : { ok: false, reason: 'ดึงรูปสลิปไม่ได้ (LINE content หมดอายุ)' };
+      if (v.ok && Math.abs(v.amount - amount) < 1) {
         await paymentApprove.approve(order, 'slipok-' + (v.ref || Date.now())).catch(e => console.error('[slip] approve:', e.message));
         return replyMessage(event.replyToken, { type: 'text', text:
           `✅ ยืนยันการชำระเงินอัตโนมัติเรียบร้อย ${what}ให้แล้วค่ะ 🎉` });
       }
+      // SlipOK ไม่ผ่าน → ต้องคนเช็ก. เตือนแอดมินทันที (นี่คือต้นตอสลิปค้าง: ก่อนหน้านี้ไม่มีใครรู้)
       console.warn(`[slip] ตรวจไม่ผ่าน ${order.ref}: ${v.reason} (code ${v.code || '-'})`);
-      const detail = v.dup ? ' (สลิปนี้เคยใช้ไปแล้วนะคะ)' : '';
+      const name = await lineClient_safeProfile(event.source.userId).catch(() => '');
+      notifyAdmins(`⚠️ สลิปตรวจอัตโนมัติไม่ผ่าน — ต้องเช็กมือ\nลูกค้า: ${name || '-'}\nรายการ: ${what} ${amount}฿ (${order.ref})\nสาเหตุ: ${v.reason}${v.dup ? ' (สลิปซ้ำ)' : ''}\n👉 เข้า dashboard กดดูสลิป → อนุมัติ`).catch(() => {});
+      const detail = v.dup ? ' (สลิปนี้เคยใช้ไปแล้วนะคะ หากโอนใหม่ส่งสลิปล่าสุดมาได้เลยค่ะ)' : '';
       return replyMessage(event.replyToken, { type: 'text', text:
         `ได้รับสลิปแล้วค่ะ ✨${detail}\nทีมงานกำลังตรวจสอบการชำระเงิน จะ${what}ให้เร็วที่สุดนะคะ 🙏` });
     }
 
-    // ไม่มี SlipOK → รอ staff อนุมัติ (เหมือนเดิม)
+    // ไม่มี SlipOK → รอ staff อนุมัติ + เตือนแอดมิน
+    const name = await lineClient_safeProfile(event.source.userId).catch(() => '');
+    notifyAdmins(`🧾 มีสลิปเข้ารอตรวจ\nลูกค้า: ${name || '-'}\nรายการ: ${what} ${amount}฿ (${order.ref})\n👉 เข้า dashboard กดดูสลิป → อนุมัติ`).catch(() => {});
     return replyMessage(event.replyToken, { type: 'text', text:
       `ได้รับสลิปแล้วค่ะ ✨\nทีมงานกำลังตรวจสอบการชำระเงิน จะ${what}ให้ภายใน 24 ชม. แล้วแจ้งกลับนะคะ 🙏` });
   }
@@ -199,6 +216,14 @@ async function handleEvent(event) {
     let name = null;
     try { name = (await lineClient_safeProfile(event.source.userId)); } catch (_) {}
     const id = await supportInbox.capture(event.source.userId, name, text).catch(() => null);
+
+    // 🔔 เตือนแอดมินเมื่อลูกค้าติดปัญหาจริง — หมวดเร่งด่วน (อารมณ์/โกรธ/ร้องเรียน/การเงิน)
+    // ไม่เตือนหมวดทั่วไป (ถามดวงเฉย ๆ) กัน spam · ตัดข้อความยาวไว้พอเห็น context
+    const { priority: pr, category: cat } = triage.classify(text);
+    if (pr === 'high') {
+      const catTH = { emotional: 'ต้องการกำลังใจ 💛', angry: 'ไม่พอใจ/ร้องเรียน 🔴', payment: 'เรื่องเงิน/สมัคร 💰' }[cat] || cat;
+      notifyAdmins(`🔔 ลูกค้าทักเรื่องด่วน (${catTH})\nชื่อ: ${name || '-'}\nid: ${event.source.userId}\n💬 "${text.slice(0, 150)}"\n👉 ตอบใน dashboard`).catch(() => {});
+    }
 
     // 🎂 พิมพ์วันเกิดเข้าแชท → พาไปกรอกฟอร์ม (ก่อน AI จะได้ไม่ตอบมั่ว) — เฉพาะคนที่ยังไม่มีดวง
     if (looksLikeBirthData(text)) {
