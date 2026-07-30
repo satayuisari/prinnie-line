@@ -145,15 +145,13 @@ async function handleEvent(event) {
   if (event.type === 'message' && event.message.type === 'image') {
     const order = await paymentOrders.attachSlip(event.source.userId, event.message.id).catch(() => null);
     if (!order) {
-      // รูปแต่ไม่มีออเดอร์ค้าง — อาจเป็นรูปทั่วไป หรือ "โอนแล้วแต่ไม่เคยกดสมัคร/ออเดอร์หมดอายุ"
-      // เดาว่าเป็นสลิปถ้าเป็นคนที่ยังไม่ active (คนจ่ายแล้วไม่ส่งรูปสุ่ม) → เตือนแอดมินไว้เช็ก
+      // รูปแต่ไม่มีออเดอร์ค้าง — ไม่กวนแอดมิน (ส่วนใหญ่รูปทั่วไป/สติกเกอร์/ยังไม่กดสมัคร)
+      // แค่ชี้ทางให้คนที่ยังไม่จ่าย กดสมัครก่อน — คนที่โอนจริงจะกดสมัครแล้วส่งสลิปใหม่เอง
       const sub = await subscribers.getByLineUserId(event.source.userId).catch(() => null);
       const active = sub && sub.subscribe_end && new Date(sub.subscribe_end) > new Date();
       if (sub && !active) {
-        const name = await lineClient_safeProfile(event.source.userId).catch(() => '');
-        notifyAdmins(`🧾 มีคนส่งรูป(น่าจะสลิป)แต่ไม่มีออเดอร์ค้าง\nชื่อ: ${name || '-'}\nid: ${event.source.userId}\nอาจโอนโดยไม่ได้กดสมัคร/ออเดอร์หมดอายุ — เข้า dashboard เช็กแล้วเปิดให้มือได้ค่ะ`).catch(() => {});
         return replyMessage(event.replyToken, { type: 'text', text:
-          'ได้รับรูปแล้วนะคะ ✨ ถ้าเป็นสลิปการโอน ทีมงานจะตรวจสอบและเปิดใช้งานให้เร็วที่สุดค่ะ 🙏\nหากยังไม่ได้กดสมัคร รบกวนกดเมนู "สมัครสมาชิก" อีกครั้งนะคะ' });
+          'ถ้าต้องการสมัครสมาชิก รบกวนกดเมนู "สมัครสมาชิก" เพื่อรับ QR ก่อนนะคะ\nโอนแล้วค่อยส่งสลิปกลับมาในแชทนี้ ระบบจะเปิดใช้งานให้อัตโนมัติค่ะ ✨' });
       }
       return;   // รูปทั่วไปของคน active/ไม่รู้จัก = เงียบ
     }
@@ -169,8 +167,15 @@ async function handleEvent(event) {
         return replyMessage(event.replyToken, { type: 'text', text:
           `✅ ยืนยันการชำระเงินอัตโนมัติเรียบร้อย ${what}ให้แล้วค่ะ 🎉` });
       }
-      // SlipOK ไม่ผ่าน → ต้องคนเช็ก. เตือนแอดมินทันที (นี่คือต้นตอสลิปค้าง: ก่อนหน้านี้ไม่มีใครรู้)
       console.warn(`[slip] ตรวจไม่ผ่าน ${order.ref}: ${v.reason} (code ${v.code || '-'})`);
+
+      // รูปมั่ว/อ่าน QR ไม่ออก → ไม่กวนแอดมิน แค่ให้ลูกค้าส่งใหม่ (คนส่งรูปมั่วเยอะ = noise)
+      if (v.qrReadable === false) {
+        return replyMessage(event.replyToken, { type: 'text', text:
+          'รูปนี้ยังอ่านไม่ออกนะคะ 🙏 รบกวนส่ง "สลิปการโอนเต็มใบ" ที่เห็น QR ชัด ๆ (แคปหน้าจอจากแอปธนาคารได้เลย) แล้วระบบจะเปิดให้อัตโนมัติค่ะ ✨' });
+      }
+
+      // สลิปจริงแต่มีปัญหา (ซ้ำ/ยอดไม่ตรง/error) → เงินอาจเข้าจริง ต้องคนเช็ก = เตือนแอดมิน
       const name = await lineClient_safeProfile(event.source.userId).catch(() => '');
       notifyAdmins(`⚠️ สลิปตรวจอัตโนมัติไม่ผ่าน — ต้องเช็กมือ\nลูกค้า: ${name || '-'}\nรายการ: ${what} ${amount}฿ (${order.ref})\nสาเหตุ: ${v.reason}${v.dup ? ' (สลิปซ้ำ)' : ''}\n👉 เข้า dashboard กดดูสลิป → อนุมัติ`).catch(() => {});
       const detail = v.dup ? ' (สลิปนี้เคยใช้ไปแล้วนะคะ หากโอนใหม่ส่งสลิปล่าสุดมาได้เลยค่ะ)' : '';

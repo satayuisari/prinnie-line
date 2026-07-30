@@ -35,7 +35,9 @@ async function verify(imageBuffer, expectedTHB) {
   if (!isEnabled()) return { ok: false, reason: 'ยังไม่ตั้งค่า SlipOK' };
   try {
     const qr = await readSlipQR(imageBuffer);
-    if (!qr) return { ok: false, reason: 'อ่าน QR ในสลิปไม่ได้ (รูปไม่ชัด/ไม่ใช่สลิป)' };
+    // qrReadable=false → รูปนี้ไม่มี QR สลิปที่อ่านออก (รูปมั่ว/ไม่ใช่สลิป/เบลอมาก)
+    // ใช้แยก "รูปมั่ว" (ไม่ต้องกวนแอดมิน บอกลูกค้าส่งใหม่) ออกจาก "สลิปจริงมีปัญหา"
+    if (!qr) return { ok: false, qrReadable: false, reason: 'อ่าน QR ในสลิปไม่ได้ (รูปไม่ชัด/ไม่ใช่สลิป)' };
     const body = { data: qr, log: true };
     if (expectedTHB) body.amount = Number(expectedTHB);   // ให้ SlipOK เช็กยอดให้ด้วย
     const r = await fetch(`https://api.slipok.com/api/line/apikey/${process.env.SLIPOK_BRANCH_ID}`, {
