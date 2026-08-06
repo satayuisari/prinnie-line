@@ -35,12 +35,25 @@ async function getStats() {
   const recent = (await db.query(`
     SELECT display_name, nickname, status, to_char(created_at,'MM-DD HH24:MI') AS created
     FROM line_subscribers ORDER BY created_at DESC LIMIT 10`)).rows;
-  // คลิกลิงก์แยกช่องทาง 7 วันหลัง (วัดว่า YouTube/TikTok/FB พาคนมาไหม)
+  // คลิกลิงก์ช่องทางทั่วไป (s:) 7 วันหลัง — YouTube/TikTok/FB
   const channels = (await db.query(`
-    SELECT source, SUM(clicks)::int AS clicks
-    FROM channel_clicks WHERE click_date >= CURRENT_DATE - 6
+    SELECT REPLACE(source,'s:','') source, SUM(clicks)::int AS clicks
+    FROM channel_clicks WHERE source LIKE 's:%' AND click_date >= CURRENT_DATE - 6
     GROUP BY source ORDER BY clicks DESC LIMIT 8`).catch(() => ({ rows: [] }))).rows;
-  return { s, recent, channels };
+  // ผลงานอินฟลู (affiliate): คลิก → สมัคร → จ่าย + รายได้
+  const affiliates = (await db.query(`
+    SELECT a.code, a.name,
+      COALESCE(c.clicks,0)::int clicks,
+      COUNT(DISTINCT s.id)::int registered,
+      COUNT(DISTINCT po.ref)::int paid,
+      COALESCE(SUM(po.amount) FILTER (WHERE po.status='PAID'),0)/100 revenue
+    FROM affiliates a
+    LEFT JOIN (SELECT REPLACE(source,'a:','') code, SUM(clicks) clicks FROM channel_clicks WHERE source LIKE 'a:%' GROUP BY 1) c ON c.code=a.code
+    LEFT JOIN line_subscribers s ON s.affiliate_code=a.code AND s.chart_data IS NOT NULL
+    LEFT JOIN payment_orders po ON po.line_user_id=s.line_user_id AND po.status='PAID'
+    WHERE a.active GROUP BY a.code, a.name, c.clicks
+    ORDER BY revenue DESC, registered DESC`).catch(() => ({ rows: [] }))).rows;
+  return { s, recent, channels, affiliates };
 }
 
 function card(label, value, sub, accent) {
@@ -88,7 +101,7 @@ function payCard(o, key) {
     </div></div>`;
 }
 
-function render({ s, recent, channels = [] }, msgs, pays, aiOn, key) {
+function render({ s, recent, channels = [], affiliates = [] }, msgs, pays, aiOn, key) {
   const mrr = (s.paying * PRICE).toLocaleString();   // นับเฉพาะลูกค้าจ่ายจริง (ตัด tester/free/admin)
   // funnel: ผู้ติดตาม → ลงทะเบียนดวง → สมาชิกจ่ายเงิน
   const regRate = s.total ? Math.round(s.registered / s.total * 100) : 0;       // แอด → ลงทะเบียน (จุดที่อุด 966→14)
@@ -168,6 +181,12 @@ function render({ s, recent, channels = [] }, msgs, pays, aiOn, key) {
       ? `<table><tbody>${channels.map(c => `<tr><td>${esc(SRC_LABEL[c.source] || c.source)}</td>
           <td style="text-align:right"><b>${c.clicks}</b> คลิก</td></tr>`).join('')}</tbody></table>`
       : '<div class="muted" style="padding:12px">ยังไม่มีคลิก — เอาลิงก์ /go?s=yt ไปโพสต์ YouTube/TikTok แล้วดูที่นี่</div>'}
+    <div class="sec">ผลงานอินฟลู (affiliate) — คลิก → สมัคร → จ่าย</div>
+    ${affiliates.length
+      ? `<table><tbody>${affiliates.map(a => `<tr><td>${esc(a.name)} <span class="muted">(${esc(a.code)})</span></td>
+          <td style="text-align:right" class="muted">${a.clicks} คลิก · ${a.registered} สมัคร</td>
+          <td style="text-align:right"><b style="color:#5CE6A1">${a.paid} จ่าย</b> · ฿${Number(a.revenue).toLocaleString()}</td></tr>`).join('')}</tbody></table>`
+      : '<div class="muted" style="padding:12px">ยังไม่มีอินฟลู — สร้างด้วย <code>node scripts/affiliate.js add &lt;code&gt; "ชื่อ"</code></div>'}
     <div class="sec">รายชื่อสมัครล่าสุด</div>
     <table><tbody>${rows || '<tr><td class="muted">ยังไม่มีสมาชิก</td></tr>'}</tbody></table>
   </div>

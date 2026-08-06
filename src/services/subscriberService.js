@@ -33,12 +33,20 @@ async function upsertSubscriber(input) {
     lng,
   });
 
+  // รหัสอินฟลู: เก็บเฉพาะที่มีจริงในตาราง affiliates + ผูกครั้งแรกเท่านั้น (COALESCE ไม่ทับของเดิม)
+  const aff = (input.affiliate_code || '').toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 24) || null;
+  let affValid = null;
+  if (aff) {
+    const a = await db.query('SELECT code FROM affiliates WHERE code=$1 AND active', [aff]).catch(() => ({ rows: [] }));
+    if (a.rows.length) affValid = aff;
+  }
+
   const result = await db.query(
     `INSERT INTO line_subscribers
        (line_user_id, display_name, picture_url, nickname,
         birth_date, birth_time, birth_time_known, birth_place, birth_lat, birth_lng,
-        chart_data, status, created_at, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'PENDING',NOW(),NOW())
+        chart_data, affiliate_code, status, created_at, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'PENDING',NOW(),NOW())
      ON CONFLICT (line_user_id) DO UPDATE SET
        display_name     = EXCLUDED.display_name,
        picture_url      = EXCLUDED.picture_url,
@@ -50,13 +58,14 @@ async function upsertSubscriber(input) {
        birth_lat        = EXCLUDED.birth_lat,
        birth_lng        = EXCLUDED.birth_lng,
        chart_data       = EXCLUDED.chart_data,
+       affiliate_code   = COALESCE(line_subscribers.affiliate_code, EXCLUDED.affiliate_code),
        updated_at       = NOW()
      RETURNING id, status, subscribe_end`,
     [
       line_user_id, display_name, picture_url, nickname,
       birth_date, birth_time || null, !!birth_time, placeDisplay,
       lat, lng,
-      JSON.stringify(chart),
+      JSON.stringify(chart), affValid,
     ]
   );
 

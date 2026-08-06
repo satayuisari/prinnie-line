@@ -251,19 +251,22 @@
     showStep('step-form');
   }
 
-  // อ่านพารามิเตอร์ view จาก URL (รองรับทั้ง location.search และ liff.state)
-  function getView() {
+  // อ่านพารามิเตอร์จาก URL (รองรับทั้ง location.search และ liff.state)
+  function getParam(key) {
     try {
-      const direct = new URLSearchParams(location.search).get('view');
+      const direct = new URLSearchParams(location.search).get(key);
       if (direct) return direct;
       const stateRaw = new URLSearchParams(location.search).get('liff.state');
       if (stateRaw) {
         const q = decodeURIComponent(stateRaw).split('?')[1] || '';
-        return new URLSearchParams(q).get('view');
+        return new URLSearchParams(q).get(key);
       }
     } catch (_) {}
     return null;
   }
+  function getView() { return getParam('view'); }
+  // รหัสอินฟลู (affiliate) จากลิงก์ /go?a=CODE → LIFF ?a=CODE — เก็บผูก attribution ตอนสมัคร
+  const AFFILIATE = (getParam('a') || '').toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 24) || null;
 
   function closeLiff() { try { liff.closeWindow(); } catch (_) {} }
 
@@ -312,7 +315,7 @@
     try {
       const r = await fetch(`${BACKEND_URL}/api/line/signup`, {
         method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ nickname, birth_date, birth_time, birth_place }),
+        body: JSON.stringify({ nickname, birth_date, birth_time, birth_place, affiliate_code: AFFILIATE }),
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || 'เกิดข้อผิดพลาด');

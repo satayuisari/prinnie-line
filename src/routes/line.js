@@ -38,7 +38,7 @@ router.get('/couple-card.jpg', async (req, res) => {
 // POST /api/line/signup
 // รับข้อมูลเกิดจาก LIFF → คำนวณดวง → เก็บ (userId มาจาก token ที่ verify แล้ว)
 router.post('/signup', requireAuth, async (req, res) => {
-  const { nickname, birth_date, birth_time, birth_place, lat, lng } = req.body;
+  const { nickname, birth_date, birth_time, birth_place, lat, lng, affiliate_code } = req.body;
   if (!birth_date) return res.status(400).json({ error: 'ต้องส่ง birth_date' });
 
   try {
@@ -46,7 +46,7 @@ router.post('/signup', requireAuth, async (req, res) => {
       line_user_id: req.line.userId,
       display_name: req.line.displayName,
       picture_url:  req.line.pictureUrl,
-      nickname, birth_date, birth_time, birth_place, lat, lng,
+      nickname, birth_date, birth_time, birth_place, lat, lng, affiliate_code,
     });
     res.json(result);
   } catch (err) {
