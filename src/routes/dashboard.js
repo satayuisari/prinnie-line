@@ -47,13 +47,17 @@ async function getStats() {
     SELECT a.code, a.name,
       COALESCE(c.clicks,0)::int clicks,
       COUNT(DISTINCT s.id)::int registered,
-      COUNT(DISTINCT com.line_user_id) FILTER (WHERE com.status<>'REVERSED')::int paid,
-      COUNT(DISTINCT com.line_user_id) FILTER (WHERE com.status='REVERSED')::int reversed
+      COALESCE(com.paid,0)::int     paid,
+      COALESCE(com.reversed,0)::int reversed
     FROM affiliates a
     LEFT JOIN (SELECT REPLACE(source,'a:','') code, SUM(clicks) clicks FROM channel_clicks WHERE source LIKE 'a:%' GROUP BY 1) c ON c.code=a.code
     LEFT JOIN line_subscribers s ON s.affiliate_code=a.code AND s.chart_data IS NOT NULL
-    LEFT JOIN affiliate_commissions com ON com.affiliate_code=a.code
-    WHERE a.active GROUP BY a.code, a.name, c.clicks
+    -- pre-aggregate ก่อน join (เหมือน scripts/affiliate.js) — join ตรงๆ แถวคูณกับ line_subscribers
+    LEFT JOIN (SELECT affiliate_code,
+        COUNT(*) FILTER (WHERE status<>'REVERSED') paid,
+        COUNT(*) FILTER (WHERE status='REVERSED')  reversed
+      FROM affiliate_commissions GROUP BY 1) com ON com.affiliate_code=a.code
+    WHERE a.active GROUP BY a.code, a.name, c.clicks, com.paid, com.reversed
     ORDER BY paid DESC, registered DESC`).catch(() => ({ rows: [] }))).rows;
   // สรุปยอด ledger รวม (สถานะเงินค่าคอม)
   const comSum = (await db.query(`

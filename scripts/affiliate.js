@@ -44,16 +44,23 @@ async function stats() {
     SELECT a.code, a.name,
       COALESCE(c.clicks,0)::int clicks,
       COUNT(DISTINCT s.id)::int registered,
-      COUNT(DISTINCT com.line_user_id) FILTER (WHERE com.status<>'REVERSED')::int paid,
-      COUNT(DISTINCT com.line_user_id) FILTER (WHERE com.status='REVERSED')::int reversed,
-      COALESCE(SUM(com.amount) FILTER (WHERE com.status='PENDING'),0)::int  pending_amt,
-      COALESCE(SUM(com.amount) FILTER (WHERE com.status='APPROVED'),0)::int approved_amt,
-      COALESCE(SUM(com.amount) FILTER (WHERE com.status='PAID'),0)::int     paid_amt
+      COALESCE(com.paid,0)::int         paid,
+      COALESCE(com.reversed,0)::int     reversed,
+      COALESCE(com.pending_amt,0)::int  pending_amt,
+      COALESCE(com.approved_amt,0)::int approved_amt,
+      COALESCE(com.paid_amt,0)::int     paid_amt
     FROM affiliates a
     LEFT JOIN (SELECT REPLACE(source,'a:','') code, SUM(clicks) clicks FROM channel_clicks WHERE source LIKE 'a:%' GROUP BY 1) c ON c.code=a.code
     LEFT JOIN line_subscribers s ON s.affiliate_code=a.code AND s.chart_data IS NOT NULL
-    LEFT JOIN affiliate_commissions com ON com.affiliate_code=a.code
-    GROUP BY a.code, a.name, c.clicks
+    -- ต้อง pre-aggregate ก่อน join: join ตรงๆ พร้อม line_subscribers แถวจะคูณกัน → SUM พองตามจำนวนสมาชิก
+    LEFT JOIN (SELECT affiliate_code,
+        COUNT(*) FILTER (WHERE status<>'REVERSED')                     paid,
+        COUNT(*) FILTER (WHERE status='REVERSED')                      reversed,
+        COALESCE(SUM(amount) FILTER (WHERE status='PENDING'),0)        pending_amt,
+        COALESCE(SUM(amount) FILTER (WHERE status='APPROVED'),0)       approved_amt,
+        COALESCE(SUM(amount) FILTER (WHERE status='PAID'),0)           paid_amt
+      FROM affiliate_commissions GROUP BY 1) com ON com.affiliate_code=a.code
+    GROUP BY a.code, a.name, c.clicks, com.paid, com.reversed, com.pending_amt, com.approved_amt, com.paid_amt
     ORDER BY paid DESC, registered DESC`)).rows;
   if (!rows.length) { console.log('ยังไม่มีอินฟลู'); return; }
 
