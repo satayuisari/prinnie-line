@@ -9,8 +9,10 @@ const subscribers = require('../services/subscriberService');
 const lineMessaging = require('../services/lineMessaging');
 const couplePurchase = require('../services/couplePurchase');
 const paymentApprove = require('../services/paymentApprove');
+const commission = require('../services/affiliateCommission');
 
 const PRICE = 399;
+const COM_BUDGET = Number(process.env.AFFILIATE_BUDGET) || 10000;   // งบค่าคอมรวม (บาท)
 const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const SRC_LABEL = { yt: '▶️ YouTube', tt: '🎵 TikTok', fb: '📘 Facebook', ig: '📸 Instagram', direct: '🔗 ตรง/อื่นๆ' };
 const ok = (req) => process.env.DASHBOARD_KEY && req.query.key === process.env.DASHBOARD_KEY;
@@ -40,20 +42,27 @@ async function getStats() {
     SELECT REPLACE(source,'s:','') source, SUM(clicks)::int AS clicks
     FROM channel_clicks WHERE source LIKE 's:%' AND click_date >= CURRENT_DATE - 6
     GROUP BY source ORDER BY clicks DESC LIMIT 8`).catch(() => ({ rows: [] }))).rows;
-  // ผลงานอินฟลู (affiliate): คลิก → สมัคร → จ่าย + รายได้
+  // ผลงานอินฟลู (affiliate) จาก Commission Ledger: คลิก → สมัคร → จ่ายจริงครั้งแรก (First Paid) + refund
   const affiliates = (await db.query(`
     SELECT a.code, a.name,
       COALESCE(c.clicks,0)::int clicks,
       COUNT(DISTINCT s.id)::int registered,
-      COUNT(DISTINCT po.ref)::int paid,
-      COALESCE(SUM(po.amount) FILTER (WHERE po.status='PAID'),0)/100 revenue
+      COUNT(DISTINCT com.line_user_id) FILTER (WHERE com.status<>'REVERSED')::int paid,
+      COUNT(DISTINCT com.line_user_id) FILTER (WHERE com.status='REVERSED')::int reversed
     FROM affiliates a
     LEFT JOIN (SELECT REPLACE(source,'a:','') code, SUM(clicks) clicks FROM channel_clicks WHERE source LIKE 'a:%' GROUP BY 1) c ON c.code=a.code
     LEFT JOIN line_subscribers s ON s.affiliate_code=a.code AND s.chart_data IS NOT NULL
-    LEFT JOIN payment_orders po ON po.line_user_id=s.line_user_id AND po.status='PAID'
+    LEFT JOIN affiliate_commissions com ON com.affiliate_code=a.code
     WHERE a.active GROUP BY a.code, a.name, c.clicks
-    ORDER BY revenue DESC, registered DESC`).catch(() => ({ rows: [] }))).rows;
-  return { s, recent, channels, affiliates };
+    ORDER BY paid DESC, registered DESC`).catch(() => ({ rows: [] }))).rows;
+  // สรุปยอด ledger รวม (สถานะเงินค่าคอม)
+  const comSum = (await db.query(`
+    SELECT
+      COALESCE(SUM(amount) FILTER (WHERE status='PENDING'),0)::int  pending,
+      COALESCE(SUM(amount) FILTER (WHERE status='APPROVED'),0)::int approved,
+      COALESCE(SUM(amount) FILTER (WHERE status='PAID'),0)::int     paid
+    FROM affiliate_commissions`).catch(() => ({ rows: [{ pending: 0, approved: 0, paid: 0 }] }))).rows[0];
+  return { s, recent, channels, affiliates, comSum };
 }
 
 function card(label, value, sub, accent) {
@@ -101,7 +110,41 @@ function payCard(o, key) {
     </div></div>`;
 }
 
-function render({ s, recent, channels = [], affiliates = [] }, msgs, pays, aiOn, key) {
+// ตาราง KPI อินฟลู: คลิก→สมัคร→จ่าย, Reg→Paid%, รายได้, ค่าคอม(ฐาน+โบนัส), CAC(เกณฑ์สี), refund%
+function affiliateTable(affiliates, comSum) {
+  let totBase = 0, totBonus = 0;
+  const rows = affiliates.map(a => {
+    const bonus = commission.bonusFor(a.paid);
+    const base  = a.paid * commission.BASE_CPA;
+    const cac   = commission.effectiveCac(a.paid);
+    const v     = commission.cacVerdict(cac);
+    const conv  = a.registered ? Math.round(a.paid / a.registered * 100) : 0;
+    const refund = (a.paid + a.reversed) ? Math.round(a.reversed / (a.paid + a.reversed) * 100) : 0;
+    totBase += base; totBonus += bonus;
+    return `<tr>
+      <td>${esc(a.name)} <span class="muted">(${esc(a.code)})</span></td>
+      <td class="muted" style="text-align:right">${a.clicks}→${a.registered}→<b style="color:#5CE6A1">${a.paid}</b><br><span style="font-size:10px">Reg→Paid ${conv}%</span></td>
+      <td style="text-align:right">฿${(a.paid * PRICE).toLocaleString()}<br><span class="muted" style="font-size:10px">${refund ? 'refund ' + refund + '%' : '—'}</span></td>
+      <td style="text-align:right">฿${(base + bonus).toLocaleString()}<br><span class="muted" style="font-size:10px">ฐาน ${base.toLocaleString()}${bonus ? ' +โบนัส ' + bonus.toLocaleString() : ''}</span></td>
+      <td style="text-align:right;color:${v.color};font-weight:700">฿${cac}<br><span style="font-size:10px">${v.label}</span></td>
+    </tr>`;
+  }).join('');
+  const budget = totBase + totBonus;                 // ค่าคอมที่ผูกพันแล้ว (ฐาน+โบนัส, ไม่นับ reversed)
+  const remain = COM_BUDGET - budget;
+  return `<table>
+    <thead><tr style="color:#a99cc8;font-size:11px">
+      <td>อินฟลู</td><td style="text-align:right">คลิก→สมัคร→จ่าย</td><td style="text-align:right">รายได้</td>
+      <td style="text-align:right">ค่าคอม</td><td style="text-align:right">CAC</td></tr></thead>
+    <tbody>${rows}</tbody></table>
+  <div class="grid" style="margin-top:10px">
+    ${card('💵 ค่าคอมค้างจ่าย', '฿' + comSum.pending.toLocaleString(), 'PENDING (ยังใน refund hold)', '#F0C868')}
+    ${card('✅ พร้อมจ่าย', '฿' + comSum.approved.toLocaleString(), 'APPROVED — จ่ายอินฟลูได้', '#5CE6A1')}
+    ${card('💸 จ่ายแล้ว', '฿' + comSum.paid.toLocaleString(), 'PAID', undefined)}
+    ${card('🎯 งบค่าคอม', '฿' + budget.toLocaleString() + ' / ' + COM_BUDGET.toLocaleString(), `เหลือ ฿${remain.toLocaleString()} (ฐาน+โบนัส)`, remain < 0 ? '#e0457b' : 'var(--gold)')}
+  </div>`;
+}
+
+function render({ s, recent, channels = [], affiliates = [], comSum = { pending: 0, approved: 0, paid: 0 } }, msgs, pays, aiOn, key) {
   const mrr = (s.paying * PRICE).toLocaleString();   // นับเฉพาะลูกค้าจ่ายจริง (ตัด tester/free/admin)
   // funnel: ผู้ติดตาม → ลงทะเบียนดวง → สมาชิกจ่ายเงิน
   const regRate = s.total ? Math.round(s.registered / s.total * 100) : 0;       // แอด → ลงทะเบียน (จุดที่อุด 966→14)
@@ -181,12 +224,8 @@ function render({ s, recent, channels = [], affiliates = [] }, msgs, pays, aiOn,
       ? `<table><tbody>${channels.map(c => `<tr><td>${esc(SRC_LABEL[c.source] || c.source)}</td>
           <td style="text-align:right"><b>${c.clicks}</b> คลิก</td></tr>`).join('')}</tbody></table>`
       : '<div class="muted" style="padding:12px">ยังไม่มีคลิก — เอาลิงก์ /go?s=yt ไปโพสต์ YouTube/TikTok แล้วดูที่นี่</div>'}
-    <div class="sec">ผลงานอินฟลู (affiliate) — คลิก → สมัคร → จ่าย</div>
-    ${affiliates.length
-      ? `<table><tbody>${affiliates.map(a => `<tr><td>${esc(a.name)} <span class="muted">(${esc(a.code)})</span></td>
-          <td style="text-align:right" class="muted">${a.clicks} คลิก · ${a.registered} สมัคร</td>
-          <td style="text-align:right"><b style="color:#5CE6A1">${a.paid} จ่าย</b> · ฿${Number(a.revenue).toLocaleString()}</td></tr>`).join('')}</tbody></table>`
-      : '<div class="muted" style="padding:12px">ยังไม่มีอินฟลู — สร้างด้วย <code>node scripts/affiliate.js add &lt;code&gt; "ชื่อ"</code></div>'}
+    <div class="sec">ผลงานอินฟลู (affiliate) — Base CPA ฿${commission.BASE_CPA}/ลูกค้าใหม่ · First Paid เท่านั้น</div>
+    ${affiliates.length ? affiliateTable(affiliates, comSum) : '<div class="muted" style="padding:12px">ยังไม่มีอินฟลู — สร้างด้วย <code>node scripts/affiliate.js add &lt;code&gt; "ชื่อ"</code></div>'}
     <div class="sec">รายชื่อสมัครล่าสุด</div>
     <table><tbody>${rows || '<tr><td class="muted">ยังไม่มีสมาชิก</td></tr>'}</tbody></table>
   </div>
