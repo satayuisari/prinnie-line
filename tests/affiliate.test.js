@@ -125,6 +125,24 @@ describe('first paid customer + idempotency', () => {
     assert.equal(await countCommissions(), 0);
   });
 
+  // กติกาที่ยืนยันแล้ว: CPA เกิดจาก "สมาชิกรายเดือนจ่ายครั้งแรก" เท่านั้น
+  // ซื้อดวงคู่ (จ่ายครั้งเดียว ไม่ใช่สมาชิก) ไม่นับเป็นลูกค้าที่ได้มา → ไม่มีค่าคอม
+  test('ซื้อดวงคู่ = ไม่มีค่าคอม (แม้จ่ายสำเร็จและมี attribution)', async () => {
+    await affiliates.create({ name: 'A', code: 'aff_cp' });
+    await helpers.registerUser(subscribers, 'U_cp', { code: 'aff_cp' });
+    await db.query(
+      `INSERT INTO payment_orders (ref, type, line_user_id, amount, status)
+       VALUES ('ORD_CP','couple','U_cp',14900,'PENDING')`);
+    await paymentApprove.approve(await orders.get('ORD_CP'), 'test');
+
+    assert.equal(await countCommissions(), 0, 'ดวงคู่ต้องไม่สร้างค่าคอม');
+
+    // จ่ายค่าสมาชิกทีหลัง = ตอนนั้นถึงได้ค่าคอม 50 (ดวงคู่ก่อนหน้าไม่ทำให้กลายเป็น renew)
+    await helpers.payOrder(db, orders, paymentApprove, 'U_cp', 'ORD_CP_SUB');
+    assert.equal(await countCommissions(), 1);
+    assert.equal(await sumCommissions(), CPA);
+  });
+
   test('ไม่มี attribution = ไม่มีค่าคอม (ลูกค้าที่มาเอง)', async () => {
     await helpers.registerUser(subscribers, 'U_direct');
     await helpers.payOrder(db, orders, paymentApprove, 'U_direct', 'ORD_D1');
