@@ -10,6 +10,7 @@ const orders      = require('../services/paymentOrders');
 const coupleCard  = require('../services/coupleCard');
 const { computeNatalChart } = require('../astro/natalChart');
 const { requireAuth } = require('../services/lineAuth');
+const go          = require('./go');
 
 // base URL สาธารณะ (สำหรับลิงก์การ์ดที่แชร์ออกนอก/ส่งเป็น image message)
 function baseUrl(req) {
@@ -47,6 +48,8 @@ router.post('/signup', requireAuth, async (req, res) => {
       display_name: req.line.displayName,
       picture_url:  req.line.pictureUrl,
       nickname, birth_date, birth_time, birth_place, lat, lng, affiliate_code,
+      // รหัสอินฟลูคนแรกที่ผู้ใช้กด (คุกกี้จาก /go) — ชนะ ?a= ในลิงก์ล่าสุดเสมอ
+      affiliate_code_first: go.firstTouch(req),
     });
     res.json(result);
   } catch (err) {

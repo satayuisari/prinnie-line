@@ -10,6 +10,7 @@ const lineMessaging = require('../services/lineMessaging');
 const couplePurchase = require('../services/couplePurchase');
 const paymentApprove = require('../services/paymentApprove');
 const commission = require('../services/affiliateCommission');
+const affAdmin = require('./affiliateAdmin');
 
 const PRICE = 399;
 const COM_BUDGET = Number(process.env.AFFILIATE_BUDGET) || 10000;   // งบค่าคอมรวม (บาท)
@@ -42,31 +43,13 @@ async function getStats() {
     SELECT REPLACE(source,'s:','') source, SUM(clicks)::int AS clicks
     FROM channel_clicks WHERE source LIKE 's:%' AND click_date >= CURRENT_DATE - 6
     GROUP BY source ORDER BY clicks DESC LIMIT 8`).catch(() => ({ rows: [] }))).rows;
-  // ผลงานอินฟลู (affiliate) จาก Commission Ledger: คลิก → สมัคร → จ่ายจริงครั้งแรก (First Paid) + refund
-  const affiliates = (await db.query(`
-    SELECT a.code, a.name,
-      COALESCE(c.clicks,0)::int clicks,
-      COUNT(DISTINCT s.id)::int registered,
-      COALESCE(com.paid,0)::int     paid,
-      COALESCE(com.reversed,0)::int reversed
-    FROM affiliates a
-    LEFT JOIN (SELECT REPLACE(source,'a:','') code, SUM(clicks) clicks FROM channel_clicks WHERE source LIKE 'a:%' GROUP BY 1) c ON c.code=a.code
-    LEFT JOIN line_subscribers s ON s.affiliate_code=a.code AND s.chart_data IS NOT NULL
-    -- pre-aggregate ก่อน join (เหมือน scripts/affiliate.js) — join ตรงๆ แถวคูณกับ line_subscribers
-    LEFT JOIN (SELECT affiliate_code,
-        COUNT(*) FILTER (WHERE status<>'REVERSED') paid,
-        COUNT(*) FILTER (WHERE status='REVERSED')  reversed
-      FROM affiliate_commissions GROUP BY 1) com ON com.affiliate_code=a.code
-    WHERE a.active GROUP BY a.code, a.name, c.clicks, com.paid, com.reversed
-    ORDER BY paid DESC, registered DESC`).catch(() => ({ rows: [] }))).rows;
-  // สรุปยอด ledger รวม (สถานะเงินค่าคอม)
-  const comSum = (await db.query(`
-    SELECT
-      COALESCE(SUM(amount) FILTER (WHERE status='PENDING'),0)::int  pending,
-      COALESCE(SUM(amount) FILTER (WHERE status='APPROVED'),0)::int approved,
-      COALESCE(SUM(amount) FILTER (WHERE status='PAID'),0)::int     paid
-    FROM affiliate_commissions`).catch(() => ({ rows: [{ pending: 0, approved: 0, paid: 0 }] }))).rows[0];
-  return { s, recent, channels, affiliates, comSum };
+  // ผลงานอินฟลู + ยอดค่าคอม: อ่านจาก service เดียวกับแท็บ Affiliates/Commissions
+  // (แหล่งเดียว = ตัวเลขหน้ารวม ตรงกับหน้า detail และ ledger เสมอ)
+  const aff = await affAdmin.load().catch(e => {
+    console.error('[dashboard] affiliate load:', e.message);
+    return null;
+  });
+  return { s, recent, channels, aff };
 }
 
 function card(label, value, sub, accent) {
@@ -114,41 +97,37 @@ function payCard(o, key) {
     </div></div>`;
 }
 
-// ตาราง KPI อินฟลู: คลิก→สมัคร→จ่าย, Reg→Paid%, รายได้, ค่าคอม(ฐาน+โบนัส), CAC(เกณฑ์สี), refund%
-function affiliateTable(affiliates, comSum) {
-  let totBase = 0, totBonus = 0;
-  const rows = affiliates.map(a => {
-    const bonus = commission.bonusFor(a.paid);
-    const base  = a.paid * commission.BASE_CPA;
-    const cac   = commission.effectiveCac(a.paid);
-    const v     = commission.cacVerdict(cac);
-    const conv  = a.registered ? Math.round(a.paid / a.registered * 100) : 0;
-    const refund = (a.paid + a.reversed) ? Math.round(a.reversed / (a.paid + a.reversed) * 100) : 0;
-    totBase += base; totBonus += bonus;
-    return `<tr>
-      <td>${esc(a.name)} <span class="muted">(${esc(a.code)})</span></td>
-      <td class="muted" style="text-align:right">${a.clicks}→${a.registered}→<b style="color:#5CE6A1">${a.paid}</b><br><span style="font-size:10px">Reg→Paid ${conv}%</span></td>
-      <td style="text-align:right">฿${(a.paid * PRICE).toLocaleString()}<br><span class="muted" style="font-size:10px">${refund ? 'refund ' + refund + '%' : '—'}</span></td>
-      <td style="text-align:right">฿${(base + bonus).toLocaleString()}<br><span class="muted" style="font-size:10px">ฐาน ${base.toLocaleString()}${bonus ? ' +โบนัส ' + bonus.toLocaleString() : ''}</span></td>
-      <td style="text-align:right;color:${v.color};font-weight:700">฿${cac}<br><span style="font-size:10px">${v.label}</span></td>
-    </tr>`;
-  }).join('');
-  const budget = totBase + totBonus;                 // ค่าคอมที่ผูกพันแล้ว (ฐาน+โบนัส, ไม่นับ reversed)
-  const remain = COM_BUDGET - budget;
+// สรุปอินฟลูสั้น ๆ บนหน้ารวม — รายละเอียดเต็มอยู่แท็บ Affiliates (ใช้ข้อมูลชุดเดียวกัน)
+function affiliateSummary(aff) {
+  if (!aff || !aff.perf.length) {
+    return '<div class="muted" style="padding:12px">ยังไม่มีอินฟลู — ไปที่แท็บ 🤝 Affiliates แล้วกด + Create Affiliate</div>';
+  }
+  const t = aff.comTotals;
+  const owed = t.pending + t.approved;                       // ผูกพันแล้วแต่ยังไม่ได้จ่าย
+  const remain = COM_BUDGET - (owed + t.paid);
+  const top = aff.perf.slice(0, 5).map(a => `<tr>
+    <td>${esc(a.name)} <span class="muted">(${esc(a.code)})</span></td>
+    <td class="muted" style="text-align:right">${a.clicks}→${a.registered}→<b style="color:#5CE6A1">${a.paid}</b>
+      <br><span style="font-size:10px">Click→Reg ${a.clickToReg}% · Reg→Paid ${a.regToPaid}%</span></td>
+    <td style="text-align:right">฿${a.revenue.toLocaleString()}
+      <br><span class="muted" style="font-size:10px">${a.reversed ? 'refund ' + a.refundRate + '%' : '—'}</span></td>
+    <td style="text-align:right;font-weight:700">${a.paid ? '฿' + a.cac : '—'}
+      <br><span class="muted" style="font-size:10px">CAC</span></td>
+  </tr>`).join('');
   return `<table>
     <thead><tr style="color:#a99cc8;font-size:11px">
-      <td>อินฟลู</td><td style="text-align:right">คลิก→สมัคร→จ่าย</td><td style="text-align:right">รายได้</td>
-      <td style="text-align:right">ค่าคอม</td><td style="text-align:right">CAC</td></tr></thead>
-    <tbody>${rows}</tbody></table>
+      <td>อินฟลู</td><td style="text-align:right">คลิก→สมัคร→จ่าย</td>
+      <td style="text-align:right">รายได้</td><td style="text-align:right">CAC</td></tr></thead>
+    <tbody>${top}</tbody></table>
   <div class="grid" style="margin-top:10px">
-    ${card('💵 ค่าคอมค้างจ่าย', '฿' + comSum.pending.toLocaleString(), 'PENDING (ยังใน refund hold)', '#F0C868')}
-    ${card('✅ พร้อมจ่าย', '฿' + comSum.approved.toLocaleString(), 'APPROVED — จ่ายอินฟลูได้', '#5CE6A1')}
-    ${card('💸 จ่ายแล้ว', '฿' + comSum.paid.toLocaleString(), 'PAID', undefined)}
-    ${card('🎯 งบค่าคอม', '฿' + budget.toLocaleString() + ' / ' + COM_BUDGET.toLocaleString(), `เหลือ ฿${remain.toLocaleString()} (ฐาน+โบนัส)`, remain < 0 ? '#e0457b' : 'var(--gold)')}
+    ${card('💵 ค่าคอมค้างจ่าย', '฿' + owed.toLocaleString(), `PENDING ${t.pending_n} · APPROVED ${t.approved_n} ใบ`, '#F0C868')}
+    ${card('💸 จ่ายอินฟลูแล้ว', '฿' + t.paid.toLocaleString(), `${t.paid_n} ใบ`, '#7FD8E8')}
+    ${card('🎯 งบค่าคอม', '฿' + (owed + t.paid).toLocaleString() + ' / ' + COM_BUDGET.toLocaleString(),
+      `เหลือ ฿${remain.toLocaleString()}`, remain < 0 ? '#e0457b' : 'var(--gold)')}
   </div>`;
 }
 
-function render({ s, recent, channels = [], affiliates = [], comSum = { pending: 0, approved: 0, paid: 0 } }, msgs, pays, aiOn, key) {
+function render({ s, recent, channels = [], aff = null }, msgs, pays, aiOn, key) {
   const mrr = (s.paying * PRICE).toLocaleString();   // นับเฉพาะลูกค้าจ่ายจริง (ตัด tester/free/admin)
   // funnel: ผู้ติดตาม → ลงทะเบียนดวง → สมาชิกจ่ายเงิน
   const regRate = s.total ? Math.round(s.registered / s.total * 100) : 0;       // แอด → ลงทะเบียน (จุดที่อุด 966→14)
@@ -198,6 +177,8 @@ function render({ s, recent, channels = [], affiliates = [], comSum = { pending:
   .sliplink{display:inline-flex;align-items:center;background:rgba(127,216,232,.15);color:#7FD8E8;
             border:1px solid rgba(127,216,232,.4);border-radius:8px;padding:8px 12px;font-size:12px;
             font-weight:600;text-decoration:none}
+  .tabs{flex-wrap:wrap}
+${affAdmin.styles}
 </style></head><body>
   <h1>🔮 Prinnie333 · Dashboard</h1>
   <div class="ts">อัปเดต ${now}</div>
@@ -205,6 +186,9 @@ function render({ s, recent, channels = [], affiliates = [], comSum = { pending:
     <button class="tb on" id="t-sub" onclick="tab('sub')">📊 Subscription</button>
     <button class="tb" id="t-pay" onclick="tab('pay')">💸 Payments <span id="pbadge">${slipWaiting ? '('+slipWaiting+')' : ''}</span></button>
     <button class="tb" id="t-sup" onclick="tab('sup')">🛟 Support <span id="ibadge">${msgs.length ? '('+msgs.length+')' : ''}</span></button>
+    <button class="tb" id="t-aff" onclick="tab('aff')">🤝 Affiliates</button>
+    <button class="tb" id="t-com" onclick="tab('com')">💵 Commissions ${aff && aff.comTotals.approved_n ? '<span class="pill" style="background:#1faa59">'+aff.comTotals.approved_n+'</span>' : ''}</button>
+    <button class="tb" id="t-rec" onclick="tab('rec')">🎯 Recruitment</button>
   </div>
 
   <div class="pane on" id="p-sub">
@@ -228,8 +212,8 @@ function render({ s, recent, channels = [], affiliates = [], comSum = { pending:
       ? `<table><tbody>${channels.map(c => `<tr><td>${esc(SRC_LABEL[c.source] || c.source)}</td>
           <td style="text-align:right"><b>${c.clicks}</b> คลิก</td></tr>`).join('')}</tbody></table>`
       : '<div class="muted" style="padding:12px">ยังไม่มีคลิก — เอาลิงก์ /go?s=yt ไปโพสต์ YouTube/TikTok แล้วดูที่นี่</div>'}
-    <div class="sec">ผลงานอินฟลู (affiliate) — Base CPA ฿${commission.BASE_CPA}/ลูกค้าใหม่ · First Paid เท่านั้น</div>
-    ${affiliates.length ? affiliateTable(affiliates, comSum) : '<div class="muted" style="padding:12px">ยังไม่มีอินฟลู — สร้างด้วย <code>node scripts/affiliate.js add &lt;code&gt; "ชื่อ"</code></div>'}
+    <div class="sec">ผลงานอินฟลู (affiliate) — ค่าคอม ฿${commission.BASE_CPA}/ลูกค้าใหม่ที่จ่ายจริงครั้งแรก · 5 อันดับแรก</div>
+    ${affiliateSummary(aff)}
     <div class="sec">รายชื่อสมัครล่าสุด</div>
     <table><tbody>${rows || '<tr><td class="muted">ยังไม่มีสมาชิก</td></tr>'}</tbody></table>
   </div>
@@ -244,10 +228,14 @@ function render({ s, recent, channels = [], affiliates = [], comSum = { pending:
     <div id="inbox">${inboxHtml}</div>
   </div>
 
+  <div class="pane" id="p-aff">${aff ? affAdmin.affiliatesPane(aff) : '<div class="muted">โหลดข้อมูล affiliate ไม่สำเร็จ</div>'}</div>
+  <div class="pane" id="p-com">${aff ? affAdmin.commissionsPane(aff) : '<div class="muted">โหลดข้อมูล affiliate ไม่สำเร็จ</div>'}</div>
+  <div class="pane" id="p-rec">${aff ? affAdmin.recruitmentPane(aff) : '<div class="muted">โหลดข้อมูล affiliate ไม่สำเร็จ</div>'}</div>
+
 <script>
   const KEY = ${JSON.stringify(key)};
   function tab(n){
-    ['sub','pay','sup'].forEach(x=>{
+    ['sub','pay','sup','aff','com','rec'].forEach(x=>{
       document.getElementById('p-'+x).classList.toggle('on', n===x);
       document.getElementById('t-'+x).classList.toggle('on', n===x);
     });
@@ -288,10 +276,12 @@ function render({ s, recent, channels = [], affiliates = [], comSum = { pending:
     try{ const r = await fetch('/dashboard/inbox?key='+encodeURIComponent(KEY)); const j = await r.json();
       document.getElementById('ibadge').textContent = j.length ? '('+j.length+')' : ''; }catch(_){}
   }, 20000);
+${affAdmin.script}
 </script></body></html>`;
 }
 
 function register(app) {
+  affAdmin.register(app);          // endpoints ของแท็บ Affiliates/Commissions/Recruitment
   app.get('/dashboard', async (req, res) => {
     if (!ok(req)) return res.status(401).send('unauthorized');
     try {

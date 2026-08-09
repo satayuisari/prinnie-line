@@ -25,7 +25,8 @@ if (isRealPg) {
 } else {
   const path = require('path');
   const { PGlite } = require('@electric-sql/pglite');
-  const dataDir = path.join(__dirname, '..', '.pglite-data');
+  // PGLITE_DIR = ชี้ไปโฟลเดอร์อื่นได้ (เทสใช้ DB แยก จะได้ไม่ยุ่งกับข้อมูล dev)
+  const dataDir = process.env.PGLITE_DIR || path.join(__dirname, '..', '.pglite-data');
   const pg = new PGlite(dataDir);
   impl = {
     driver: 'pglite',

@@ -1,6 +1,7 @@
 const db = require('../db');
 const { computeNatalChart } = require('../astro/natalChart');
 const geocoding = require('./geocodingService');
+const affiliateAudit = require('./affiliateAudit');
 
 // สมัคร/อัปเดต subscriber พร้อมคำนวณดวงกำเนิดเก็บไว้
 async function upsertSubscriber(input) {
@@ -33,13 +34,23 @@ async function upsertSubscriber(input) {
     lng,
   });
 
-  // รหัสอินฟลู: เก็บเฉพาะที่มีจริงในตาราง affiliates + ผูกครั้งแรกเท่านั้น (COALESCE ไม่ทับของเดิม)
-  const aff = (input.affiliate_code || '').toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 24) || null;
+  // รหัสอินฟลู: ผูกได้เฉพาะรหัสที่มีจริง + สถานะ ACTIVE เท่านั้น
+  // (PAUSED/OFF/รหัสมั่ว = ไม่ผูก attribution ใหม่ แต่ของเก่าที่ผูกไว้แล้วไม่ถูกแตะ)
+  // FIRST VALID ATTRIBUTION WINS 2 ชั้น:
+  //   1) คุกกี้ first-touch จาก /go (คนแรกที่ผู้ใช้กด) มาก่อน ?a= ของลิงก์ล่าสุด
+  //   2) COALESCE ตอน upsert — คนที่ผูกไว้แล้วไม่มีวันถูกทับ
+  const norm = v => (v || '').toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 24) || null;
   let affValid = null;
-  if (aff) {
-    const a = await db.query('SELECT code FROM affiliates WHERE code=$1 AND active', [aff]).catch(() => ({ rows: [] }));
-    if (a.rows.length) affValid = aff;
+  for (const cand of [norm(input.affiliate_code_first), norm(input.affiliate_code)]) {
+    if (!cand) continue;
+    const a = await db.query("SELECT code FROM affiliates WHERE code=$1 AND status='ACTIVE'", [cand]).catch(() => ({ rows: [] }));
+    if (a.rows.length) { affValid = cand; break; }
   }
+  // มี attribution เดิมอยู่แล้วไหม — ใช้ตัดสินว่าควรลง audit ว่า "ผูกใหม่" หรือไม่
+  const prevAff = affValid
+    ? (await db.query('SELECT affiliate_code FROM line_subscribers WHERE line_user_id=$1', [line_user_id])
+        .catch(() => ({ rows: [] }))).rows[0]?.affiliate_code || null
+    : null;
 
   const result = await db.query(
     `INSERT INTO line_subscribers
@@ -71,6 +82,14 @@ async function upsertSubscriber(input) {
 
   const row = result.rows[0];
   let subStatus = row.status;
+
+  // ผูก attribution ใหม่จริง ๆ เท่านั้นถึงลง audit (คนเดิมที่มีเจ้าของแล้ว = ไม่ต้องบันทึกซ้ำ)
+  if (affValid && !prevAff) {
+    await affiliateAudit.log('ATTRIBUTION_CREATED', {
+      actor: 'system', entityType: 'affiliate', entityId: affValid,
+      newValue: `subscriber ${line_user_id.slice(0, 10)}…`,
+    });
+  }
 
   // โหมดเทสฟรี: เปิดใช้งานทันทีไม่ต้องจ่าย (ตั้ง FREE_ACCESS=true)
   if (process.env.FREE_ACCESS === 'true') {

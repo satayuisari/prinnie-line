@@ -16,10 +16,27 @@ async function countClick(source) {
   ).catch(e => console.error('[go] นับคลิกไม่ได้:', e.message));
 }
 
+// FIRST VALID ATTRIBUTION WINS — จดรหัสอินฟลู "คนแรก" ที่ผู้ใช้กดไว้ในคุกกี้
+// คนเดิมกดลิงก์อินฟลูคนที่สองทีหลัง cookie จะไม่ถูกเขียนทับ → เครดิตยังเป็นของคนแรก
+// (URL param บอกได้แค่ลิงก์ "ล่าสุด" ที่กด จึงใช้คุกกี้เป็นตัวตัดสินหลัก param เป็นตัวสำรอง)
+const COOKIE = 'paff';
+const COOKIE_DAYS = 30;
+
+function firstTouch(req) {
+  const raw = req.headers.cookie || '';
+  const hit = raw.split(';').map(s => s.trim()).find(s => s.startsWith(COOKIE + '='));
+  return hit ? clean(decodeURIComponent(hit.slice(COOKIE.length + 1))) : '';
+}
+
 function register(app) {
   app.get('/go', async (req, res) => {
     const aff = clean(req.query.a);
     if (aff) {
+      // จดเฉพาะครั้งแรก — มีอยู่แล้วไม่ทับ
+      if (!firstTouch(req)) {
+        res.setHeader('Set-Cookie',
+          `${COOKIE}=${encodeURIComponent(aff)}; Max-Age=${COOKIE_DAYS * 86400}; Path=/; HttpOnly; SameSite=Lax`);
+      }
       // affiliate: เด้งไป LIFF สมัคร พร้อมรหัส → เก็บตอนลงทะเบียน (นับคลิกด้วย prefix a:)
       res.redirect(302, LIFF_ID ? `https://liff.line.me/${LIFF_ID}?a=${aff}` : ADD_URL);
       countClick('a:' + aff);
@@ -31,4 +48,4 @@ function register(app) {
   });
 }
 
-module.exports = { register };
+module.exports = { register, firstTouch, COOKIE };

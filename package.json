@@ -11,7 +11,8 @@
     "dev": "nodemon src/index.js",
     "migrate": "node database/migrate.js",
     "import": "node database/import/import-content.js",
-    "verify": "node scripts/verify-chart.js"
+    "verify": "node scripts/verify-chart.js",
+    "test": "node --test tests/*.test.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.65.0",

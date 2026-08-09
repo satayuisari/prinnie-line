@@ -21,3 +21,7 @@ cowork/poc/cloudflared.exe
 
 # macOS junk
 .DS_Store
+
+# DB ชั่วคราวของเทส (สร้างใหม่ทุกครั้งที่รัน npm test)
+.pglite-test*
+.pglite-preview
