@@ -4,7 +4,6 @@ const subscribers = require('../services/subscriberService');
 const horoscope   = require('../services/horoscopeService');
 const synastry    = require('../services/synastryService');
 const geocoding   = require('../services/geocodingService');
-const beamService = require('../services/beamService');
 const promptpay   = require('../services/promptpayService');
 const orders      = require('../services/paymentOrders');
 const coupleCard  = require('../services/coupleCard');
@@ -130,7 +129,7 @@ router.post('/synastry', requireAuth, async (req, res) => {
     return res.json({
       ...base,
       locked: true,
-      price: beamService.COUPLE_PRICE_THB,
+      price: promptpay.COUPLE_PRICE_THB,   // ราคาที่โชว์ต้องมาจากที่เดียวกับตอนสร้างออเดอร์
       teaser: synastry.pickTeaser(reading.aspects),
     });
   } catch (err) {

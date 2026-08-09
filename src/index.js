@@ -9,7 +9,6 @@ const bodyParser = require('body-parser');
 const lineRoutes    = require('./routes/line');
 const paymentRoutes = require('./routes/payment');
 const webhook       = require('./routes/webhook');
-const beamWebhook   = require('./routes/beamWebhook');
 const dashboard     = require('./routes/dashboard');
 const goRedirect    = require('./routes/go');
 const scheduler     = require('./scheduler/dailyHoroscope');
@@ -32,9 +31,8 @@ app.use(helmet({
 app.set('trust proxy', 1);   // อยู่หลัง Railway proxy → ให้ rate-limit เห็น client IP จริง
 
 // ⚠️ webhook ต้อง register ก่อน bodyParser.json() — ใช้ raw body ตรวจลายเซ็น
-// (register ก่อน rate-limit ด้วย → LINE/Beam ส่ง burst ได้ ไม่โดนจำกัด)
+// (register ก่อน rate-limit ด้วย → LINE ส่ง burst ได้ ไม่โดนจำกัด)
 webhook.register(app);      // LINE
-beamWebhook.register(app);  // Beam (ชำระเงิน)
 
 app.use(bodyParser.json());
 app.use(express.static('liff'));
