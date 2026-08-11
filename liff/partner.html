@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Prinnie333 · Affiliate Partner</title>
+<meta name="description" content="ค่าตอบแทน 50 บาท ต่อลูกค้าใหม่ที่ชำระเงินจริงครั้งแรก — ระบบนับให้อัตโนมัติตั้งแต่คลิกจนถึงจ่ายเงิน">
+<meta property="og:title" content="Prinnie333 · Affiliate Partner">
+<meta property="og:description" content="50 บาท ต่อลูกค้าใหม่ที่ชำระเงินจริงครั้งแรก · เราบอกตรง ๆ ว่าอะไรนับ อะไรไม่นับ">
+<style>
+/* ─────────────────────────────────────────────────────────────
+   ⚙️ ตัวเลขที่ต้องอัปเดต — แก้ที่ data-* ใน HTML ด้านล่าง ไม่ต้องแก้ CSS
+   ทั้งหมดมาจากระบบจริง ณ 11 ส.ค. 2026 (ดูหมายเหตุที่ Bon ได้รับ)
+   ───────────────────────────────────────────────────────────── */
+:root{
+  --ink:#0E0821;          /* ท้องฟ้ากลางคืน — พื้นหลังหลัก */
+  --ink-2:#1B1036;        /* แผงข้อมูล */
+  --ink-3:#241546;        /* เส้นขอบ/พื้นรอง */
+  --gold:#E8C77A;         /* ทองแบรนด์ — ใช้กับ "เงินที่ได้จริง" เท่านั้น */
+  --lilac:#C77DFF;
+  --haze:#E8C4F7;
+  --paper:#F6F1FF;
+  --muted:#9A8FBF;
+  --ok:#7BE0A8;
+  --line:rgba(232,199,122,.18);
+  --wrap:660px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{
+  background:var(--ink);
+  color:var(--paper);
+  font-family:'Sarabun','Noto Sans Thai',-apple-system,'Segoe UI',sans-serif;
+  line-height:1.65;
+  /* บรรยากาศเดียวของหน้า: แสงจาง ๆ สองจุด ไม่มีอนิเมชันพื้นหลัง */
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -8%, rgba(199,125,255,.20), transparent 70%),
+    radial-gradient(ellipse 60% 40% at 88% 12%, rgba(232,199,122,.10), transparent 70%);
+  background-repeat:no-repeat;
+}
+.wrap{max-width:var(--wrap);margin:0 auto;padding:0 22px}
+
+/* ── หัวเรื่อง ───────────────────────────────────────────── */
+header{padding:56px 0 12px}
+.eyebrow{
+  font-size:11px;letter-spacing:.22em;text-transform:uppercase;
+  color:var(--gold);font-weight:700;margin-bottom:22px;
+  display:flex;align-items:center;gap:10px;
+}
+.eyebrow::after{content:"";flex:1;height:1px;background:var(--line)}
+h1{
+  font-size:clamp(30px,7.4vw,46px);
+  line-height:1.24;font-weight:800;letter-spacing:-.015em;
+  margin-bottom:18px;
+}
+h1 .amt{color:var(--gold);white-space:nowrap}
+.lede{font-size:16.5px;color:var(--haze);max-width:46ch}
+.lede strong{color:var(--paper);font-weight:700}
+
+/* ── แถบตัวเลขจริง ──────────────────────────────────────── */
+.facts{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:1px;
+  background:var(--line);border:1px solid var(--line);border-radius:14px;
+  overflow:hidden;margin:34px 0 8px;
+}
+.fact{background:var(--ink-2);padding:16px 14px}
+.fact dt{font-size:11px;color:var(--muted);letter-spacing:.04em;margin-bottom:6px}
+.fact dd{font-size:21px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.fact dd span{font-size:12px;font-weight:600;color:var(--muted);letter-spacing:0}
+
+/* ── SIGNATURE: บัญชีเดินทางของลูกค้าหนึ่งคน ───────────── */
+section{padding:52px 0}
+.sec-head{margin-bottom:26px}
+h2{font-size:clamp(21px,4.6vw,26px);font-weight:800;letter-spacing:-.01em;line-height:1.35}
+.sec-head p{color:var(--muted);font-size:14.5px;margin-top:7px}
+
+.chain{border-top:1px solid var(--line)}
+.step{
+  display:grid;grid-template-columns:1fr auto;gap:16px;align-items:start;
+  padding:20px 0 20px 26px;border-bottom:1px solid var(--line);position:relative;
+}
+/* เส้นเวลา + จุด */
+.step::before{
+  content:"";position:absolute;left:5px;top:0;bottom:0;width:1px;background:var(--line);
+}
+.step:first-child::before{top:26px}
+.step:last-child::before{bottom:calc(100% - 26px)}
+.step::after{
+  content:"";position:absolute;left:0;top:24px;width:11px;height:11px;border-radius:50%;
+  background:var(--ink);border:1.5px solid var(--ink-3);
+}
+.step.pay::after{background:var(--gold);border-color:var(--gold);box-shadow:0 0 0 5px rgba(232,199,122,.14)}
+.step h3{font-size:16px;font-weight:700;letter-spacing:-.005em}
+.step p{font-size:13.5px;color:var(--muted);margin-top:3px;max-width:40ch}
+.pill{
+  font-size:19px;font-weight:800;font-variant-numeric:tabular-nums;
+  color:var(--ink-3);white-space:nowrap;padding-top:1px;
+}
+.step.pay .pill{
+  color:var(--gold);font-size:26px;
+  text-shadow:0 0 26px rgba(232,199,122,.4);
+}
+.step.pay h3{color:var(--gold)}
+.chain-note{
+  margin-top:18px;font-size:13.5px;color:var(--muted);
+  padding-left:26px;border-left:2px solid var(--line);
+}
+.chain-note b{color:var(--haze);font-weight:600}
+
+/* ── กติกา ─────────────────────────────────────────────── */
+.rules{display:grid;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.rule{background:var(--ink-2);padding:18px 18px}
+.rule h3{font-size:15px;font-weight:700;margin-bottom:5px}
+.rule p{font-size:13.5px;color:var(--muted)}
+.rule .tag{
+  display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.08em;
+  color:var(--ok);border:1px solid rgba(123,224,168,.3);border-radius:20px;
+  padding:1px 9px;margin-bottom:8px;text-transform:uppercase;
+}
+
+/* ── ของที่ได้ ─────────────────────────────────────────── */
+.kit{list-style:none;display:grid;gap:11px}
+.kit li{
+  display:grid;grid-template-columns:auto 1fr;gap:13px;align-items:baseline;
+  font-size:15px;padding-bottom:11px;border-bottom:1px dashed var(--line);
+}
+.kit li:last-child{border-bottom:0}
+.kit .k{color:var(--gold);font-weight:800;font-size:13px;letter-spacing:.05em}
+.kit span.d{color:var(--muted);font-size:13.5px;display:block;margin-top:1px}
+
+/* ── ปิดท้าย ───────────────────────────────────────────── */
+.cta{
+  border:1px solid var(--line);border-radius:18px;padding:30px 24px;
+  background:linear-gradient(165deg,var(--ink-2),rgba(36,21,70,.35));
+  text-align:center;
+}
+.cta h2{margin-bottom:10px}
+.cta p{color:var(--haze);font-size:15px;max-width:38ch;margin:0 auto 22px}
+.btn{
+  display:inline-block;background:var(--gold);color:#241100;
+  font-weight:800;font-size:16px;text-decoration:none;
+  padding:14px 30px;border-radius:12px;letter-spacing:.01em;
+  transition:transform .16s ease, box-shadow .16s ease;
+}
+.btn:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(232,199,122,.25)}
+.btn:focus-visible{outline:2px solid var(--paper);outline-offset:3px}
+.cta small{display:block;margin-top:14px;color:var(--muted);font-size:12.5px}
+footer{padding:34px 0 48px;text-align:center;color:var(--muted);font-size:12px;border-top:1px solid var(--line);margin-top:20px}
+
+/* ── โหลดหน้า: เผยทีละแถว ครั้งเดียว ─────────────────── */
+@media (prefers-reduced-motion:no-preference){
+  .reveal{opacity:0;transform:translateY(10px);animation:rise .55s cubic-bezier(.22,.9,.3,1) forwards}
+  @keyframes rise{to{opacity:1;transform:none}}
+}
+@media (max-width:420px){
+  .facts{grid-template-columns:1fr;}
+  .fact{display:flex;justify-content:space-between;align-items:baseline;padding:13px 15px}
+  .fact dt{margin-bottom:0}
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow reveal" style="animation-delay:.05s">Prinnie333 · Affiliate Partner</div>
+    <h1 class="reveal" style="animation-delay:.12s">
+      ค่าตอบแทน <span class="amt">50 บาท</span><br>ต่อลูกค้าใหม่ที่ชำระเงินจริงครั้งแรก
+    </h1>
+    <p class="lede reveal" style="animation-delay:.2s">
+      ไม่ใช่ค่าคลิก ไม่ใช่ค่ายอดวิว ระบบนับให้อัตโนมัติตั้งแต่คนกดลิงก์ของคุณจนถึงวันที่เขาจ่ายเงินจริง
+      และ<strong>เราเขียนไว้ให้ชัดว่าอะไรไม่นับด้วย</strong>
+    </p>
+
+    <dl class="facts reveal" style="animation-delay:.28s">
+      <div class="fact"><dt>ค่าสมาชิก</dt><dd>฿399 <span>/ เดือน</span></dd></div>
+      <div class="fact"><dt>ผูกดวงกำเนิดแล้ว</dt><dd>874 <span>คน</span></dd></div>
+      <div class="fact"><dt>คุณได้ต่อลูกค้าใหม่</dt><dd style="color:var(--gold)">฿50</dd></div>
+    </dl>
+  </header>
+
+  <section>
+    <div class="sec-head">
+      <h2>เส้นทางของลูกค้าหนึ่งคน<br>และจุดเดียวที่คุณได้เงิน</h2>
+      <p>ตัวเลขทางขวาคือสิ่งที่คุณได้จริงในแต่ละขั้น</p>
+    </div>
+
+    <div class="chain">
+      <div class="step">
+        <div>
+          <h3>เขากดลิงก์เฉพาะของคุณ</h3>
+          <p>ระบบจำทันทีว่ามาจากคุณ ถึงเขาจะยังไม่ทำอะไรต่อในวันนั้น</p>
+        </div>
+        <div class="pill">฿0</div>
+      </div>
+
+      <div class="step">
+        <div>
+          <h3>สมัครและผูกดวงกำเนิด</h3>
+          <p>ชื่อคุณถูกผูกติดกับลูกค้าคนนี้ถาวร ไม่มีใครมาแย่งทีหลังได้</p>
+        </div>
+        <div class="pill">฿0</div>
+      </div>
+
+      <div class="step pay">
+        <div>
+          <h3>จ่ายค่าสมาชิก 399 ครั้งแรก</h3>
+          <p>ตรงนี้คุณได้เงิน — บันทึกเข้าระบบทันทีที่ยอดเข้า</p>
+        </div>
+        <div class="pill">฿50</div>
+      </div>
+
+      <div class="step">
+        <div>
+          <h3>เขาต่ออายุเดือนถัดไป</h3>
+          <p>ดีกับเรา แต่เขาไม่ใช่ลูกค้าใหม่แล้ว จึงไม่มีค่าตอบแทนรอบสอง</p>
+        </div>
+        <div class="pill">฿0</div>
+      </div>
+    </div>
+
+    <p class="chain-note">
+      พูดตรง ๆ ว่า <b>คนกดลิงก์เยอะไม่ได้แปลว่าได้เงินเยอะ</b> สิ่งที่ทำให้ได้เงินคือมีคนจ่ายจริง
+      ถ้าคอนเทนต์คุณพาคนที่ตั้งใจดูดวงมา ตัวเลขจะขึ้นเอง
+    </p>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>กติกาที่เขียนไว้ก่อน ไม่ใช่ตอนมีปัญหา</h2></div>
+    <div class="rules">
+      <div class="rule">
+        <span class="tag">คนแรกได้</span>
+        <h3>ใครแนะนำก่อน คนนั้นได้เครดิต</h3>
+        <p>ถ้าลูกค้ากดลิงก์คุณก่อน แล้ววันหลังไปกดลิงก์พาร์ทเนอร์คนอื่น เครดิตยังเป็นของคุณ</p>
+      </div>
+      <div class="rule">
+        <span class="tag">1 คน 1 ครั้ง</span>
+        <h3>นับหนึ่งครั้งต่อลูกค้าหนึ่งคน</h3>
+        <p>ต่อให้เขาอยู่กับเราสามปี ค่าตอบแทนคือครั้งเดียวตอนจ่ายเงินครั้งแรก</p>
+      </div>
+      <div class="rule">
+        <span class="tag">รอ 7 วัน</span>
+        <h3>อนุมัติหลังพ้น 7 วัน แล้วโอน</h3>
+        <p>เผื่อกรณีลูกค้าขอคืนเงิน พ้นช่วงนี้แล้วยอดจะขึ้นเป็น “พร้อมจ่าย” และเราโอนให้</p>
+      </div>
+      <div class="rule">
+        <span class="tag">ขอดูได้</span>
+        <h3>อยากรู้ยอดเมื่อไหร่ ทักมาได้</h3>
+        <p>เราส่งรายงานให้เป็นข้อความ: คลิกกี่ครั้ง สมัครกี่คน จ่ายจริงกี่คน ค้างจ่ายเท่าไหร่</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>ของที่เราเตรียมให้</h2>
+      <p>ไม่ต้องคิดเองทั้งหมด หยิบไปโพสต์ได้เลย</p>
+    </div>
+    <ul class="kit">
+      <li><span class="k">ลิงก์</span><span>ลิงก์เฉพาะของคุณ<span class="d">นับผลแยกจากพาร์ทเนอร์คนอื่นทั้งหมด</span></span></li>
+      <li><span class="k">แคปชั่น</span><span>แบบสั้นและแบบยาว<span class="d">แก้เป็นสำนวนตัวเองได้ ไม่บังคับใช้ตามนั้น</span></span></li>
+      <li><span class="k">ภาพ</span><span>โปสเตอร์และคลิปแนวตั้ง<span class="d">ขนาดพร้อมลง TikTok / Reels / Shorts</span></span></li>
+      <li><span class="k">รายงาน</span><span>สรุปผลงานของคุณ<span class="d">ขอเมื่อไหร่ก็ได้ ไม่ต้องรอสิ้นเดือน</span></span></li>
+    </ul>
+  </section>
+
+  <section>
+    <div class="cta">
+      <h2>สนใจร่วมงานกัน</h2>
+      <p>ทักมาบอกช่องทางที่คุณทำและกลุ่มคนดูของคุณ เดี๋ยวเราส่งลิงก์กับชุดคอนเทนต์ให้</p>
+      <a class="btn" href="https://line.me/R/ti/p/%40prinnie333">ทักไลน์ @prinnie333</a>
+      <small>ทดลองทำก่อนได้ ไม่มีค่าใช้จ่าย ไม่มีสัญญาผูกมัด</small>
+    </div>
+  </section>
+
+  <footer>Prinnie333 · ดูดวงผ่าน LINE</footer>
+</div>
+
+</body>
+</html>

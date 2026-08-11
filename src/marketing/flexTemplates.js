@@ -2,6 +2,8 @@
 // ธีมแบรนด์ Prinnie333: ม่วง (#5B2A86 / #6B3FA0) + ทอง (#D4AF37)
 // ใช้ได้ทั้ง broadcast เปิดตัว และ nudge follow-up รายคน
 
+const loyalty     = require('../services/loyaltyReward');
+
 const PURPLE      = '#5B2A86';
 const PURPLE_SOFT = '#6B3FA0';
 const GOLD        = '#D4AF37';
@@ -122,6 +124,7 @@ function upsellSubscribe(liffUrl) {
       '✨ เพียง 399 บาท/เดือน',
       '+ ดวงสัปดาห์/เดือน/ปี + ไพ่ + ผูกดวงคู่',
       '🎁 สมัครช่วงเปิดตัว แถมผูกดวงคู่ฟรี (มูลค่า 199)',
+      `🔮 ต่อครบ ${loyalty.MILESTONE} เดือน รับดูดวงส่วนตัวกับ อ.ปรินนี่ 1 ชม. (มูลค่า ${loyalty.REWARD_VALUE.toLocaleString()})`,
     ],
     buttonLabel: '✨ สมัครรับดวงรายวัน',
     buttonUri: liffUrl,
@@ -179,6 +182,7 @@ function renewalSoon(liffUrl, daysLeft, expireText) {
       '---',
       '☀️ ดวงรายวันส่วนตัวจากดวงเกิดจริงของคุณ',
       '+ ดวงสัปดาห์/เดือน/ปี + ไพ่ + ผูกดวงคู่ไม่จำกัด',
+      `🔮 ต่อครบ ${loyalty.MILESTONE} เดือน รับดูดวงกับ อ.ปรินนี่ 1 ชม. (มูลค่า ${loyalty.REWARD_VALUE.toLocaleString()})`,
     ],
     buttonLabel: '✨ ต่ออายุสมาชิก',
     buttonUri: liffUrl,

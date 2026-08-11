@@ -18,6 +18,7 @@ const renewals      = require('./scheduler/renewals');
 const launchCast    = require('./scheduler/launchBroadcast');
 const perfReport    = require('./scheduler/perfReport');
 const pendingOrders = require('./scheduler/pendingOrders');
+const loyalty       = require('./scheduler/loyaltyRewards');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -65,6 +66,7 @@ renewals.start();
 launchCast.start();
 perfReport.start();
 pendingOrders.start();
+loyalty.start();
 
 const mode = process.env.TEST_MODE === 'true' ? '🧪 TEST_MODE (push เฉพาะ allowlist)' : '🚀 PRODUCTION';
 app.listen(PORT, () => {
