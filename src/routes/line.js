@@ -11,6 +11,8 @@ const coupleCard  = require('../services/coupleCard');
 const { computeNatalChart } = require('../astro/natalChart');
 const { requireAuth } = require('../services/lineAuth');
 const go          = require('./go');
+const loyalty     = require('../services/loyaltyReward');
+const askBrief    = require('../services/askBrief');
 
 // base URL สาธารณะ (สำหรับลิงก์การ์ดที่แชร์ออกนอก/ส่งเป็น image message)
 function baseUrl(req) {
@@ -55,6 +57,40 @@ router.post('/signup', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('[signup]', err.message);
     res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Ask Prinnie 3 (สิทธิ์สมาชิก) ──────────────────────────────────────────
+// GET /api/line/ask-status — หน้า ask.html ถามก่อนว่ามีสิทธิ์ใช้ได้ไหม
+router.get('/ask-status', requireAuth, async (req, res) => {
+  try {
+    const reward = await loyalty.activeFor(req.line.userId);
+    if (reward) return res.json({ eligible: true, expires: reward.expires, maxQuestions: loyalty.MAX_Q });
+    const cycles = await loyalty.paidCycles(req.line.userId);
+    const left = Math.max(0, loyalty.MILESTONE - cycles);
+    res.json({
+      eligible: false,
+      reason: left > 0
+        ? `เป็นสมาชิกครบ ${loyalty.MILESTONE} รอบ รับสิทธิ์อัตโนมัติ (ตอนนี้ ${cycles} รอบ · อีก ${left} รอบ)`
+        : 'สิทธิ์ของคุณถูกใช้ไปแล้ว หรือหมดอายุแล้วค่ะ',
+    });
+  } catch (err) {
+    console.error('[ask-status]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/line/ask-submit — ส่ง 3 คำถามพร้อมกัน ครั้งเดียวจบ
+// ส่งเสร็จ → เตรียม brief ให้อาจารย์แบบเบื้องหลัง (ล้มเหลวก็ไม่กระทบลูกค้า)
+router.post('/ask-submit', requireAuth, async (req, res) => {
+  try {
+    const result = await loyalty.submitQuestions(req.line.userId, req.body && req.body.questions);
+    res.json({ ok: true, id: result.id });
+    askBrief.build(result.id)
+      .then(brief => loyalty.saveBrief(result.id, brief))
+      .catch(e => console.error('[ask-submit] brief:', e.message));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
   }
 });
 

@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ask Prinnie 3 · สิทธิ์สมาชิก</title>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<style>
+  :root{--ink:#1a0533;--ink2:#2d0a5a;--gold:#E8C77A;--haze:#e8c4f7;--paper:#F6F1FF;--muted:#9A8FBF}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:linear-gradient(165deg,var(--ink),var(--ink2));color:var(--paper);
+       font-family:'Sarabun','Noto Sans Thai',-apple-system,sans-serif;line-height:1.6;
+       padding:22px 18px 40px;min-height:100vh}
+  .wrap{max-width:520px;margin:0 auto}
+  .kick{font-size:11px;letter-spacing:.2em;color:var(--gold);font-weight:700;text-transform:uppercase}
+  h1{font-size:26px;font-weight:800;margin:8px 0 6px;letter-spacing:-.01em}
+  .sub{color:var(--haze);font-size:14.5px;margin-bottom:20px}
+  .card{background:rgba(255,255,255,.06);border:1px solid rgba(232,199,122,.22);
+        border-radius:14px;padding:16px;margin-bottom:14px}
+  label{display:block;font-size:13px;color:var(--gold);font-weight:700;margin-bottom:7px}
+  textarea{width:100%;background:rgba(0,0,0,.25);color:var(--paper);border:1px solid rgba(255,255,255,.16);
+           border-radius:10px;padding:11px;font:inherit;font-size:15px;resize:vertical;min-height:74px}
+  textarea:focus{outline:2px solid var(--gold);outline-offset:1px}
+  .count{font-size:11px;color:var(--muted);text-align:right;margin-top:4px}
+  button{width:100%;background:var(--gold);color:#241100;border:0;border-radius:12px;
+         padding:15px;font:inherit;font-size:16px;font-weight:800;cursor:pointer}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  .note{font-size:12.5px;color:var(--muted);margin-top:14px}
+  .state{text-align:center;padding:48px 16px}
+  .state h2{font-size:20px;margin-bottom:10px}
+  .state p{color:var(--haze);font-size:15px}
+  .err{color:#ffb4b4}
+  ul{margin:8px 0 0 18px;font-size:13px;color:var(--muted)}
+  li{margin-bottom:3px}
+  [hidden]{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div id="loading" class="state"><p>กำลังตรวจสอบสิทธิ์…</p></div>
+
+  <div id="form" hidden>
+    <div class="kick">สิทธิ์สมาชิก Prinnie333</div>
+    <h1>Ask Prinnie 3</h1>
+    <p class="sub">ส่ง 3 คำถามที่คุณอยากรู้ที่สุด อาจารย์ปรินนี่จะดูจากดวงของคุณแล้วตอบกลับเป็นการส่วนตัว</p>
+
+    <div class="card">
+      <label for="q1">คำถามที่ 1</label>
+      <textarea id="q1" maxlength="300" placeholder="เช่น ปีนี้ควรเปลี่ยนงานไหม เพราะรู้สึกตันมาก"></textarea>
+      <div class="count"><span id="c1">0</span>/300</div>
+    </div>
+    <div class="card">
+      <label for="q2">คำถามที่ 2</label>
+      <textarea id="q2" maxlength="300"></textarea>
+      <div class="count"><span id="c2">0</span>/300</div>
+    </div>
+    <div class="card">
+      <label for="q3">คำถามที่ 3</label>
+      <textarea id="q3" maxlength="300"></textarea>
+      <div class="count"><span id="c3">0</span>/300</div>
+    </div>
+
+    <button id="send" disabled>ส่งคำถามให้อาจารย์</button>
+    <div class="note">
+      ส่งได้ครั้งเดียว กรุณาตรวจให้แน่ใจก่อนกดส่ง
+      <ul>
+        <li>ถามให้เจาะจงจะได้คำตอบที่ตรงกว่า</li>
+        <li>อาจารย์ตอบกลับทางแชทนี้ ไม่มีค่าใช้จ่ายเพิ่ม</li>
+        <li>สิทธิ์นี้ใช้ได้ครั้งเดียว ไม่มีถามต่อเนื่อง</li>
+      </ul>
+    </div>
+  </div>
+
+  <div id="done" class="state" hidden>
+    <h2>✨ ส่งคำถามเรียบร้อยแล้ว</h2>
+    <p>อาจารย์ปรินนี่จะดูดวงของคุณและตอบกลับทางแชทนี้<br>ขอบคุณที่อยู่กับเรานะคะ 💜</p>
+  </div>
+
+  <div id="nope" class="state" hidden>
+    <h2>ยังไม่มีสิทธิ์ที่ใช้ได้</h2>
+    <p id="nope-msg">สิทธิ์ Ask Prinnie 3 จะได้รับอัตโนมัติเมื่อเป็นสมาชิกครบตามเกณฑ์</p>
+  </div>
+</div>
+
+<script>
+  // LIFF ID เดียวกับหน้าสมัคร (LINE Login channel) — ส่งทาง ?liff= ได้เผื่อเปลี่ยน channel
+  const LIFF_ID = new URLSearchParams(location.search).get('liff') || '2010382680-c6gh82Rm';
+  const $ = id => document.getElementById(id);
+  const show = id => { for (const s of ['loading','form','done','nope']) $(s).hidden = (s !== id); };
+
+  let token = null;
+
+  function wireCounters() {
+    [1,2,3].forEach(n => {
+      const ta = $('q'+n);
+      ta.addEventListener('input', () => {
+        $('c'+n).textContent = ta.value.trim().length;
+        $('send').disabled = ![1,2,3].every(i => $('q'+i).value.trim().length >= 5);
+      });
+    });
+  }
+
+  async function api(path, opts) {
+    const r = await fetch(path, Object.assign({
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    }, opts || {}));
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    return j;
+  }
+
+  async function start() {
+    try {
+      await liff.init({ liffId: LIFF_ID });
+      if (!liff.isLoggedIn()) { liff.login(); return; }
+      token = liff.getAccessToken();
+
+      const status = await api('/api/line/ask-status');
+      if (!status.eligible) {
+        $('nope-msg').textContent = status.reason || $('nope-msg').textContent;
+        show('nope'); return;
+      }
+      wireCounters();
+      show('form');
+
+      $('send').addEventListener('click', async () => {
+        $('send').disabled = true;
+        $('send').textContent = 'กำลังส่ง…';
+        try {
+          await api('/api/line/ask-submit', {
+            method: 'POST',
+            body: JSON.stringify({ questions: [1,2,3].map(n => $('q'+n).value.trim()) }),
+          });
+          show('done');
+          setTimeout(() => { if (liff.isInClient()) liff.closeWindow(); }, 2500);
+        } catch (e) {
+          $('send').disabled = false;
+          $('send').textContent = 'ส่งคำถามให้อาจารย์';
+          alert('ส่งไม่สำเร็จ: ' + e.message);
+        }
+      });
+    } catch (e) {
+      $('loading').innerHTML = '<p class="err">เปิดหน้านี้ไม่สำเร็จ: ' + e.message +
+        '<br><br>กรุณาเปิดจากลิงก์ในแชท LINE นะคะ</p>';
+    }
+  }
+  start();
+</script>
+</body>
+</html>

@@ -8,6 +8,9 @@ const commission = require('../services/affiliateCommission');
 const candidates = require('../services/affiliateCandidates');
 const kit = require('../services/promoterKit');
 const audit = require('../services/affiliateAudit');
+const loyalty = require('../services/loyaltyReward');
+const askBrief = require('../services/askBrief');
+const lineMessaging = require('../services/lineMessaging');
 
 const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const ok = (req) => process.env.DASHBOARD_KEY && req.query.key === process.env.DASHBOARD_KEY;
@@ -474,6 +477,39 @@ function register(app) {
   app.post('/dashboard/outreach', async (req, res) => {
     if (!guard(req, res)) return;
     try { await kit.setOutreach(req.body?.text); res.json({ ok: true }); } catch (e) { fail(res, e); }
+  });
+
+  // ── Ask Prinnie 3: คิวงานอาจารย์ ────────────────────────────────────────
+  app.get('/dashboard/ask/queue', async (req, res) => {
+    if (!guard(req, res)) return;
+    try { res.json({ queue: await loyalty.advisorQueue(), kpi: await loyalty.kpi() }); }
+    catch (e) { fail(res, e); }
+  });
+
+  // สร้าง brief ใหม่ (เผื่อรอบแรกล้มเหลว หรืออยากให้สรุปใหม่)
+  app.post('/dashboard/ask/:id/brief', async (req, res) => {
+    if (!guard(req, res)) return;
+    try {
+      const brief = await askBrief.build(req.params.id);
+      await loyalty.saveBrief(req.params.id, brief);
+      res.json({ ok: true, brief });
+    } catch (e) { fail(res, e); }
+  });
+
+  // อาจารย์ตอบแล้ว → ส่งคำตอบเข้าแชทลูกค้า + ปิดสิทธิ์เป็น USED
+  app.post('/dashboard/ask/:id/answer', async (req, res) => {
+    if (!guard(req, res)) return;
+    try {
+      const text = String((req.body && req.body.text) || '').trim();
+      if (!text) return res.status(400).json({ error: 'ยังไม่ได้พิมพ์คำตอบ' });
+      const row = (await loyalty.list({ limit: 500 })).find(r => String(r.id) === String(req.params.id));
+      if (!row) return res.status(404).json({ error: 'ไม่พบสิทธิ์นี้' });
+      // ส่งให้ลูกค้าก่อน ส่งไม่ผ่านจะได้ไม่ปิดสิทธิ์ทิ้ง (ลูกค้าต้องได้คำตอบจริงถึงจะนับว่าใช้แล้ว)
+      await lineMessaging.pushText(row.line_user_id,
+        `🔮 คำตอบจากอาจารย์ปรินนี่\n\n${text}`);
+      await loyalty.markAnswered(req.params.id);
+      res.json({ ok: true });
+    } catch (e) { fail(res, e); }
   });
 
   app.get('/dashboard/audit', async (req, res) => {
