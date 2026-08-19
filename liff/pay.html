@@ -16,6 +16,14 @@
           box-shadow:0 10px 40px rgba(0,0,0,0.45)}
   .qrcard .pp{font-size:0.7rem;letter-spacing:1px;color:#1B1036;font-weight:700;margin-bottom:8px}
   .qrcard img{width:100%;max-width:280px;height:auto;display:block;margin:0 auto}
+  .savebtn{display:block;margin:14px auto 8px;max-width:320px;text-align:center;
+           background:#E8C77A;color:#241100;font-weight:800;font-size:16px;
+           padding:14px 18px;border-radius:12px;text-decoration:none;cursor:pointer}
+  .savebtn:active{opacity:.85}
+  .savehint{max-width:340px;margin:0 auto 6px;font-size:13px;line-height:1.6;
+            color:#e8c4f7;text-align:center}
+  .savehint b{color:#fff}
+  .savehint2{font-size:11.5px;color:#a99cc8;margin-top:4px}
   .amount{margin-top:14px;text-align:center}
   .amount .n{font-size:2.4rem;font-weight:800;color:#E8C77A;text-shadow:0 0 18px rgba(232,199,122,0.4)}
   .amount .u{font-size:1rem;color:rgba(255,255,255,0.6)}
@@ -47,8 +55,17 @@
       </div>
       <div class="amount"><span class="n" id="amt">399</span> <span class="u">บาท</span></div>
 
+      <!-- ⚠️ ลูกค้าเปิดหน้านี้บนมือถือเครื่องเดียวกับที่จะใช้แอปธนาคาร → เอากล้องส่องจอตัวเองไม่ได้
+           ต้องบันทึกรูปก่อน แล้วใช้ "สแกนจากอัลบั้ม" ในแอปธนาคาร -->
+      <a class="savebtn" id="save" download="prinnie-promptpay.png">⬇️ บันทึกรูป QR ลงเครื่อง</a>
+      <div class="savehint">
+        จ่ายด้วยมือถือเครื่องเดียวกัน? <b>กดบันทึกรูปก่อน</b> แล้วเปิดแอปธนาคาร →
+        เลือก <b>“สแกน”</b> → <b>“รูปภาพ/อัลบั้ม”</b> แล้วเลือกรูปนี้
+        <div class="savehint2">(ถ้าปุ่มไม่ทำงาน ให้กดค้างที่รูป QR แล้วเลือกบันทึกรูป)</div>
+      </div>
+
       <ul class="steps">
-        <li><span class="num">1</span><span>เปิด<span class="hl">แอปธนาคาร</span> แล้วสแกน QR ด้านบน (ยอดเงินจะขึ้นให้อัตโนมัติ)</span></li>
+        <li><span class="num">1</span><span>เปิด<span class="hl">แอปธนาคาร</span> แล้วสแกน QR ด้านบน — จ่ายด้วยเครื่องเดียวกันให้<span class="hl">บันทึกรูปแล้วสแกนจากอัลบั้ม</span> (ยอดเงินขึ้นให้อัตโนมัติ)</span></li>
         <li><span class="num">2</span><span>โอนเงิน <span class="hl">399 บาท</span> แล้ว<span class="hl">บันทึกภาพสลิป</span></span></li>
         <li><span class="num">3</span><span>กลับไปที่<span class="hl">แชท LINE Prinnie333</span> แล้ว<span class="hl">ส่งรูปสลิป</span>เข้ามาในแชท</span></li>
         <li><span class="num">✓</span><span>ทีมงานตรวจสอบและ<span class="hl">เปิดใช้งานสมาชิกให้ภายใน 24 ชม.</span> 🌟</span></li>
@@ -71,7 +88,23 @@
       if(d.status === 'PAID'){ showErr('รายการนี้ชำระเงินเรียบร้อยแล้ว ✅'); return; }
       if(d.type === 'couple'){ document.getElementById('title').textContent = 'ปลดล็อกผลดวงคู่'; }
       document.getElementById('amt').textContent = (d.price_thb || 399).toLocaleString();
-      document.getElementById('qr').src = `/api/payment/promptpay-qr/${encodeURIComponent(ref)}`;
+      const qrUrl = `/api/payment/promptpay-qr/${encodeURIComponent(ref)}`;
+      document.getElementById('qr').src = qrUrl;
+      // ปุ่มบันทึกรูป: ใช้ blob เพื่อให้ดาวน์โหลดได้จริงในเบราว์เซอร์ในแอป LINE
+      // ถ้าเบราว์เซอร์ไม่รองรับ download (iOS บางรุ่น) → เปิดรูปเต็มจอให้กดค้างบันทึกเอง
+      const save = document.getElementById('save');
+      save.href = qrUrl;
+      save.addEventListener('click', async (e) => {
+        e.preventDefault();
+        try{
+          const blob = await (await fetch(qrUrl)).blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url; a.download = 'prinnie-promptpay.png';
+          document.body.appendChild(a); a.click(); a.remove();
+          setTimeout(()=>URL.revokeObjectURL(url), 4000);
+        }catch(_){ window.open(qrUrl, '_blank'); }
+      });
       document.getElementById('ref').textContent = 'รหัสอ้างอิง: ' + ref;
       document.getElementById('content').style.display = 'block';
     }catch(err){ showErr(err.message); }
