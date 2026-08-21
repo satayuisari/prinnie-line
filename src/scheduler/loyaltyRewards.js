@@ -1,67 +1,62 @@
-// ตาข่ายกันตกของสิทธิ์ Ask Prinnie 3
+// "ดวงเลือกคุณ" — รันทุกวันที่ 15 เวลา 09:00 Bangkok
+// หาสมาชิกที่ดาวจรเดือนนี้ทำมุมกับดวงกำเนิดแรงที่สุด → ให้สิทธิ์ดูดวงกับอาจารย์ 1 ชม.
 //
-// ปกติสิทธิ์ถูกให้ "ทันทีที่จ่ายครบเกณฑ์" ใน paymentApprove แล้ว
-// ตัวนี้คือรอบตรวจซ้ำสิ้นเดือน เผื่อมีเคสที่ให้ไม่สำเร็จตอนนั้น (เช่น DB สะดุด/แจ้งไม่ผ่าน)
-// → "ตรวจสอบและแจ้งสิทธิ์สมาชิกที่ครบเกณฑ์" ไม่ใช่การประกาศรายชื่อผู้ชนะ (ไม่ใช่การแข่งขัน/สุ่ม)
+// ⚖️ ไม่มีการสุ่ม — คำนวณจากตำแหน่งดาวจริง รันซ้ำวันเดิมได้ผลเดิมเสมอ (ดู monthlyPick.js)
 //
-// ⚖️ ไม่มีการสุ่มในไฟล์นี้โดยตั้งใจ — ครบเกณฑ์ได้ทุกคน
-// ความปลอดภัย: ปิดโดยดีฟอลต์ (LOYALTY_ENABLED) · เคารพ TEST_MODE · ให้สิทธิ์ก่อนค่อยส่งข้อความ
+// ความปลอดภัย:
+//   - ปิดโดยดีฟอลต์: ต้องตั้ง LOYALTY_ENABLED=true
+//   - เคารพ TEST_MODE (pushText บล็อกคนนอก allowlist อยู่แล้ว)
+//   - บันทึกผู้ได้รับก่อน ค่อยส่งข้อความ — ส่งไม่ผ่านลูกค้าไม่เสียสิทธิ์
+//   - unique index บน cycle → รอบเดือนหนึ่งมีผู้ได้รับคนเดียวเสมอ ต่อให้รันซ้ำ
 const cron    = require('node-cron');
+const pick    = require('../services/monthlyPick');
 const loyalty = require('../services/loyaltyReward');
 const lineMsg = require('../services/lineMessaging');
 
-const askUrl = () => (process.env.PUBLIC_BASE_URL
-  || 'https://prinnie-app-production.up.railway.app').replace(/\/$/, '') + '/ask.html';
-
-async function runLoyalty({ dryRun = false } = {}) {
+async function runMonthlyPick({ at = new Date(), dryRun = false } = {}) {
   if (process.env.LOYALTY_ENABLED !== 'true') {
-    console.log('[Loyalty] ข้าม — ตั้ง LOYALTY_ENABLED=true เพื่อเปิดใช้งาน');
-    return { granted: 0, notified: 0, disabled: true };
+    console.log('[ดวงเลือกคุณ] ข้าม — ตั้ง LOYALTY_ENABLED=true เพื่อเปิดใช้งาน');
+    return { picked: null, disabled: true };
   }
 
-  const eligible = await loyalty.findEligible();
   if (dryRun) {
-    console.log(`[Loyalty] dry-run — ครบเกณฑ์แต่ยังไม่ได้สิทธิ์ ${eligible.length} คน`);
-    return { granted: 0, notified: 0, eligible: eligible.length, dryRun: true };
+    const ranked = await pick.rank(at);
+    console.log(`[ดวงเลือกคุณ] dry-run ${pick.cycleOf(at)} — เข้าเกณฑ์ ${ranked.length} คน` +
+      (ranked[0] ? ` · อันดับ 1: ${ranked[0].name || ranked[0].line_user_id.slice(0, 10)} (${ranked[0].detail} · ${ranked[0].score})` : ''));
+    return { picked: null, dryRun: true, ranked: ranked.length, top: ranked[0] || null };
   }
 
-  const granted = await loyalty.grantAllEligible();
-  let notified = 0;
-  for (const g of granted) {
-    try {
-      await lineMsg.pushText(g.line_user_id, loyalty.grantMessage(g.nickname, askUrl()));
-      await loyalty.markNotified(g.id);
-      notified++;
-    } catch (err) {
-      // สิทธิ์ให้ไปแล้ว แค่ยังแจ้งไม่ได้ — รอบหน้าเก็บตก หรือแอดมินส่งเองจากแดชบอร์ด
-      console.error(`[Loyalty] แจ้งไม่สำเร็จ ${g.line_user_id}: ${err.message}`);
-    }
+  const winner = await pick.pickForCycle(at);
+  if (!winner) {
+    console.log(`[ดวงเลือกคุณ] ${pick.cycleOf(at)} — ไม่มีผู้ได้รับ (รอบนี้เลือกไปแล้ว หรือไม่มีใครเข้าเกณฑ์)`);
+    return { picked: null };
   }
 
-  console.log(`[Loyalty] เสร็จ — สิทธิ์ใหม่ ${granted.length} · แจ้งแล้ว ${notified}`);
+  console.log(`[ดวงเลือกคุณ] ${winner.cycle} → ${winner.line_user_id.slice(0, 10)}… · ${winner.detail} · คะแนน ${winner.score} (จาก ${winner.total} คน)`);
 
-  // เตือนแอดมินถ้าคิวอาจารย์เริ่มยาว (capacity guard — ไม่ได้จำกัดคนได้สิทธิ์ แต่เตือนให้จัดคิวทัน)
-  const queue = await loyalty.advisorQueue();
-  if (queue.length) {
-    const oldest = Math.round(Math.max(...queue.map(q => Number(q.hours_waiting) || 0)));
-    await lineMsg.notifyAdmins(
-      `📋 คิว Ask Prinnie 3: รอตอบ ${queue.length} ราย (รอนานสุด ${oldest} ชม.)`
-    ).catch(() => {});
+  try {
+    await lineMsg.pushText(winner.line_user_id, pick.pickMessage(winner.name, winner.detail));
+    await loyalty.markNotified(winner.id);
+  } catch (err) {
+    console.error(`[ดวงเลือกคุณ] แจ้งไม่สำเร็จ ${winner.line_user_id}: ${err.message}`);
   }
-  return { granted: granted.length, notified, eligible: eligible.length, queue: queue.length };
+
+  await lineMsg.notifyAdmins(
+    `🔮 ดวงเลือกคุณ ${winner.cycle}\n` +
+    `ผู้ได้รับ: ${winner.name || winner.line_user_id.slice(0, 12)}\n` +
+    `เหตุผล: ${winner.detail} (คะแนน ${winner.score})\n` +
+    `คัดจากสมาชิกที่เข้าเกณฑ์ ${winner.total} คน · รอนัดเวลากับอาจารย์`
+  ).catch(() => {});
+
+  return { picked: winner };
 }
 
 function start() {
-  // 19:00 ของวันที่ 28–31 แล้วเช็คในโค้ดว่าเป็นวันสุดท้ายของเดือนจริงไหม
-  cron.schedule('0 19 28-31 * *', () => {
-    const tomorrow = new Date(Date.now() + 86400000);
-    if (tomorrow.getDate() !== 1) return;
-    runLoyalty();
-  }, { timezone: 'Asia/Bangkok' });
-
+  // วันที่ 15 ของทุกเดือน 09:00 Bangkok
+  cron.schedule('0 9 15 * *', () => runMonthlyPick(), { timezone: 'Asia/Bangkok' });
   const state = process.env.LOYALTY_ENABLED === 'true'
     ? '(ENABLED)' : '(ปิดอยู่ — ตั้ง LOYALTY_ENABLED=true)';
-  console.log(`[Loyalty] ${loyalty.REWARD_NAME} — ตรวจสิทธิ์สิ้นเดือน 19:00 · ครบ ${loyalty.MILESTONE} รอบ ${state}`);
+  console.log(`[ดวงเลือกคุณ] คัดผู้ได้รับทุกวันที่ 15 · 09:00 Bangkok · สมาชิกครบ ${pick.MIN_MEMBER_DAYS} วัน ${state}`);
 }
 
-module.exports = { start, runLoyalty };
+module.exports = { start, runMonthlyPick };
