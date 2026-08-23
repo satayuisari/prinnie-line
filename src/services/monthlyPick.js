@@ -32,7 +32,7 @@ async function eligibleMembers(at = new Date()) {
     WHERE s.status='ACTIVE'
       AND s.chart_data IS NOT NULL
       AND s.payment_ref IS NOT NULL
-      AND s.payment_ref NOT IN ('tester','free-trial','free','founder')
+      AND s.payment_ref NOT IN ('tester','free-trial','free','founder','LIFETIME_COMP')
       AND s.subscribe_start IS NOT NULL
       AND s.subscribe_start <= $1::timestamp - ($2 || ' days')::interval
       AND NOT EXISTS (

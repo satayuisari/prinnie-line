@@ -26,7 +26,7 @@ async function getStats() {
       COUNT(*) FILTER (WHERE chart_data IS NOT NULL AND status='PENDING')::int AS pending_reg,
       COUNT(*) FILTER (WHERE status='ACTIVE')::int    AS active,
       COUNT(*) FILTER (WHERE status='ACTIVE' AND payment_ref IS NOT NULL
-                        AND payment_ref NOT IN ('tester','free-trial','free','founder'))::int AS paying,
+                        AND payment_ref NOT IN ('tester','free-trial','free','founder','LIFETIME_COMP'))::int AS paying,
       COUNT(*) FILTER (WHERE status='PENDING')::int   AS pending,
       COUNT(*) FILTER (WHERE status='EXPIRED')::int   AS expired,
       COUNT(*) FILTER (WHERE status='CANCELLED')::int AS cancelled,
