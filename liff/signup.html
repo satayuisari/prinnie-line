@@ -115,6 +115,20 @@
     <button class="btn btn-ghost" onclick="showStep('step-form')">แก้ไขข้อมูลเกิด</button>
   </div>
 
+  <!-- Step 2c: มาจากปุ่ม "ปลดล็อก/ต่ออายุ" — คนที่มีดวงแล้วไม่ต้องกรอกฟอร์มซ้ำ กดจ่ายได้เลย -->
+  <div class="step" id="step-pay">
+    <div class="chartbox">
+      <div style="font-size:17px;font-weight:700;margin-bottom:8px">สมาชิก Prinnie333</div>
+      <div style="font-size:15px;line-height:1.7">
+        ดวงรายวันส่วนตัวทุกเช้า · ดวงสัปดาห์/เดือน/ปีฉบับเต็ม<br>
+        ไพ่ทาโรต์ + ความหมายเต็ม · ผูกดวงคู่ไม่จำกัด
+      </div>
+      <div style="font-size:22px;font-weight:800;margin-top:12px">399 บาท / เดือน</div>
+    </div>
+    <button class="btn" id="payBtn2" onclick="goToPayment('payBtn2')">ไปหน้าจ่ายเงิน →</button>
+    <button class="btn btn-ghost" onclick="showStep('step-form')">แก้ไขข้อมูลวันเกิด</button>
+  </div>
+
   <!-- Step 2b: พื้นดวงฉบับเต็ม (ฟรี — ไม่ต้องจ่าย) -->
   <div class="step" id="step-natal">
     <div class="chartbox" id="natalbox"></div>
@@ -241,6 +255,14 @@
 
     // มีดวงแล้ว → โชว์ปุ่มเข้าผูกดวงคู่
     if (hasChart) document.getElementById('btn-goto-couple').style.display = '';
+
+    // เปิดมาจากปุ่ม "ปลดล็อก/ต่ออายุ 399" (?view=pay)
+    // คนที่ลงทะเบียนดวงไว้แล้วไม่ต้องกรอกฟอร์มซ้ำ → เข้าหน้าจ่ายเงินเลย เหลือกดครั้งเดียว
+    // (เดิมเด้งมาที่ฟอร์มวันเกิด ลูกค้าเข้าใจว่าให้สมัครใหม่ แล้วก็ปิดหนีไป)
+    if (getView() === 'pay') {
+      if (hasChart) { showStep('step-pay'); return; }
+      // ยังไม่มีดวง → ต้องลงทะเบียนก่อนถึงจ่ายได้ ปล่อยให้เห็นฟอร์มตามปกติ
+    }
 
     // เปิดมาจากชิป/ปุ่ม "ดูดวงคู่" (?view=couple) → ไปฟอร์มคู่ทันที (ถ้ามีดวงแล้ว)
     if (getView() === 'couple') {
@@ -497,8 +519,9 @@
     }
   }
 
-  async function goToPayment() {
-    const btn = document.getElementById('payBtn');
+  async function goToPayment(btnId) {
+    const btn = document.getElementById(btnId || 'payBtn');
+    const label = btn.textContent;
     btn.disabled = true; btn.textContent = 'กำลังเปิดหน้าจ่ายเงิน...';
     try {
       const r = await fetch(`${BACKEND_URL}/api/payment/create-promptpay`, {
@@ -511,7 +534,7 @@
     } catch (err) {
       alert(err.message);
     } finally {
-      btn.disabled = false; btn.textContent = 'สมัครสมาชิก 399 บาท/เดือน →';
+      btn.disabled = false; btn.textContent = label;
     }
   }
 

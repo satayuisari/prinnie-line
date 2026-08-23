@@ -13,7 +13,7 @@ const lineMsg   = require('../services/lineMessaging');
 const flex      = require('../marketing/flexTemplates');
 
 const LIFF_URL = process.env.LINE_LIFF_ID
-  ? `https://liff.line.me/${process.env.LINE_LIFF_ID}`
+  ? `https://liff.line.me/${process.env.LINE_LIFF_ID}?view=pay`
   : 'https://liff.line.me/YOUR_LIFF_ID';
 const COUPLE_URL    = `${LIFF_URL}?view=couple`;
 const EARLYBIRD_END = process.env.EARLYBIRD_END || '2026-06-30';

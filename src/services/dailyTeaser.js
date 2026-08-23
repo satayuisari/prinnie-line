@@ -4,7 +4,7 @@
 const horoscope = require('./horoscopeService');
 
 const LIFF_URL = process.env.LINE_LIFF_ID
-  ? `https://liff.line.me/${process.env.LINE_LIFF_ID}`
+  ? `https://liff.line.me/${process.env.LINE_LIFF_ID}?view=pay`
   : 'https://liff.line.me/YOUR_LIFF_ID';
 
 // คืน array ข้อความ (รูปไพ่ + ข้อความ teaser) ให้ reply/push ได้เลย

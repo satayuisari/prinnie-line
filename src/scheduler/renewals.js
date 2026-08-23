@@ -19,7 +19,7 @@ const db      = require('../db');
 const lineMsg = require('../services/lineMessaging');
 
 const LIFF_URL = process.env.LINE_LIFF_ID
-  ? `https://liff.line.me/${process.env.LINE_LIFF_ID}`
+  ? `https://liff.line.me/${process.env.LINE_LIFF_ID}?view=pay`
   : 'https://liff.line.me/YOUR_LIFF_ID';
 
 const DAY = 86400000;
