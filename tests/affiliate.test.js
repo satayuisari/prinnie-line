@@ -320,3 +320,27 @@ describe('CRM + workflow ของแอดมิน', () => {
     }
   });
 });
+
+// ── ตัวเตือนออเดอร์ค้าง: ห้ามทวงคนที่จ่ายแล้ว (บั๊กจริง เกิดขึ้น 30 ครั้งบน production) ──
+describe('ตัวเตือนออเดอร์ค้าง', () => {
+  test('ไม่ทวงลูกค้าที่เป็นสมาชิกอยู่แล้ว', async () => {
+    const { remindPending } = require('../src/scheduler/pendingOrders');
+    // คนที่ 1: จ่ายสำเร็จแล้ว (ACTIVE) แต่มีออเดอร์เก่าค้าง → ห้ามทวง
+    await helpers.registerUser(subscribers, 'U_member');
+    await db.query(`UPDATE line_subscribers SET status='ACTIVE', payment_ref='sub_x',
+                    subscribe_end = NOW() + INTERVAL '20 days' WHERE line_user_id='U_member'`);
+    // คนที่ 2: ยังไม่เคยเป็นสมาชิก มีออเดอร์ค้าง → ต้องทวง
+    await helpers.registerUser(subscribers, 'U_lead');
+
+    for (const u of ['U_member', 'U_lead']) {
+      await db.query(
+        `INSERT INTO payment_orders (ref, type, line_user_id, amount, status, created_at)
+         VALUES ($1,'subscription',$2,39900,'PENDING', NOW() - INTERVAL '2 days')`, [u + '_old', u]);
+    }
+
+    const r = await remindPending();
+    assert.equal(r.total, 1, 'ต้องเหลือคนเดียวที่เข้าเกณฑ์ทวง (คนที่ยังไม่ได้เป็นสมาชิก)');
+    const nagged = await db.query("SELECT ref FROM payment_orders WHERE reminded_at IS NOT NULL");
+    assert.deepEqual(nagged.rows.map(x => x.ref), ['U_lead_old'], 'ต้องไม่ไปแตะออเดอร์ของสมาชิก');
+  });
+});
