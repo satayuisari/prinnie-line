@@ -20,21 +20,19 @@
            background:#E8C77A;color:#241100;font-weight:800;font-size:16px;
            padding:14px 18px;border-radius:12px;text-decoration:none;cursor:pointer}
   .savebtn:active{opacity:.85}
-  .savehint{max-width:340px;margin:0 auto 6px;font-size:13px;line-height:1.6;
-            color:#e8c4f7;text-align:center}
-  .savehint b{color:#fff}
-  .savehint2{font-size:11.5px;color:#a99cc8;margin-top:4px}
-  .amount{margin-top:14px;text-align:center}
-  .amount .n{font-size:2.4rem;font-weight:800;color:#E8C77A;text-shadow:0 0 18px rgba(232,199,122,0.4)}
+  .amount{text-align:center;margin-bottom:16px}
+  .amount .what{font-size:0.9rem;color:rgba(255,255,255,0.65);margin-bottom:2px}
+  .amount .n{font-size:3rem;font-weight:800;color:#E8C77A;text-shadow:0 0 18px rgba(232,199,122,0.4);line-height:1.1}
   .amount .u{font-size:1rem;color:rgba(255,255,255,0.6)}
-  .steps{background:rgba(255,255,255,0.05);border:1px solid rgba(232,199,122,0.25);
-         border-radius:16px;padding:16px 18px;margin-top:20px}
-  .steps li{list-style:none;display:flex;gap:10px;align-items:flex-start;padding:7px 0;
-            font-size:0.92rem;line-height:1.5;color:rgba(255,255,255,0.92)}
-  .steps .num{flex:0 0 24px;height:24px;border-radius:50%;background:#E8C77A;color:#1B1036;
-              font-weight:800;font-size:0.8rem;display:flex;align-items:center;justify-content:center}
-  .hl{color:#E8C77A;font-weight:700}
-  .note{font-size:0.78rem;color:rgba(255,255,255,0.5);text-align:center;margin-top:16px;line-height:1.6}
+  .steps{margin-top:18px;padding:0;counter-reset:s}
+  .steps li{list-style:none;display:flex;gap:11px;align-items:flex-start;padding:9px 2px;
+            font-size:0.95rem;line-height:1.55;color:rgba(255,255,255,0.9)}
+  .steps li + li{border-top:1px solid rgba(255,255,255,0.08)}
+  .steps b{color:#E8C77A;font-weight:700}
+  .steps .num{flex:0 0 24px;height:24px;border-radius:50%;background:rgba(232,199,122,0.16);
+              color:#E8C77A;font-weight:800;font-size:0.8rem;
+              display:flex;align-items:center;justify-content:center;margin-top:1px}
+  .note{font-size:0.8rem;color:rgba(255,255,255,0.5);text-align:center;margin-top:18px;line-height:1.7}
   .err{background:rgba(220,80,80,0.15);border:1px solid rgba(220,80,80,0.4);color:#ffb4b4;
        border-radius:12px;padding:14px;text-align:center;font-size:0.9rem;display:none}
   .ref{font-family:monospace;font-size:0.72rem;color:rgba(255,255,255,0.35);text-align:center;margin-top:14px}
@@ -43,35 +41,35 @@
 <body>
   <div class="wrap">
     <div class="logo">PRINNIE333</div>
-    <h1 id="title">สมัครสมาชิกรายเดือน</h1>
-    <div class="sub">สแกนจ่ายผ่าน PromptPay แล้วส่งสลิปกลับมาในแชท</div>
 
     <div class="err" id="err"></div>
 
     <div id="content" style="display:none">
-      <div class="qrcard">
-        <div class="pp">▼ PromptPay · พร้อมเพย์</div>
-        <img id="qr" alt="PromptPay QR" />
+      <!-- ยอดเงินขึ้นก่อน QR — ลูกค้าอยากรู้ว่าจ่ายเท่าไหร่เป็นอย่างแรก -->
+      <div class="amount">
+        <div class="what" id="title">ค่าสมาชิกรายเดือน</div>
+        <span class="n" id="amt">399</span> <span class="u">บาท</span>
       </div>
-      <div class="amount"><span class="n" id="amt">399</span> <span class="u">บาท</span></div>
+
+      <div class="qrcard">
+        <div class="pp">พร้อมเพย์ · PromptPay</div>
+        <img id="qr" alt="QR พร้อมเพย์" />
+      </div>
 
       <!-- ⚠️ ลูกค้าเปิดหน้านี้บนมือถือเครื่องเดียวกับที่จะใช้แอปธนาคาร → เอากล้องส่องจอตัวเองไม่ได้
-           ต้องบันทึกรูปก่อน แล้วใช้ "สแกนจากอัลบั้ม" ในแอปธนาคาร -->
-      <a class="savebtn" id="save" download="prinnie-promptpay.png">⬇️ บันทึกรูป QR ลงเครื่อง</a>
-      <div class="savehint">
-        จ่ายด้วยมือถือเครื่องเดียวกัน? <b>กดบันทึกรูปก่อน</b> แล้วเปิดแอปธนาคาร →
-        เลือก <b>“สแกน”</b> → <b>“รูปภาพ/อัลบั้ม”</b> แล้วเลือกรูปนี้
-        <div class="savehint2">(ถ้าปุ่มไม่ทำงาน ให้กดค้างที่รูป QR แล้วเลือกบันทึกรูป)</div>
+           ปุ่มบันทึกรูปจึงเป็นปุ่มหลักของหน้านี้ ไม่ใช่ของเสริม -->
+      <a class="savebtn" id="save" download="prinnie-promptpay.png">⬇️  บันทึกรูป QR</a>
+
+      <ol class="steps">
+        <li><span class="num">1</span><span>บันทึกรูป QR แล้วเปิด<b>แอปธนาคาร</b> → <b>สแกน</b> → <b>รูปภาพ/อัลบั้ม</b></span></li>
+        <li><span class="num">2</span><span>โอนเงิน (ยอดขึ้นให้อัตโนมัติ) แล้ว<b>เก็บภาพสลิป</b></span></li>
+        <li><span class="num">3</span><span><b>ส่งรูปสลิปเข้าแชท</b> Prinnie333 — ระบบเปิดให้อัตโนมัติ</span></li>
+      </ol>
+
+      <div class="note">
+        มีสองเครื่อง? สแกน QR ด้านบนจากอีกเครื่องได้เลย<br>
+        ปุ่มบันทึกไม่ทำงาน? กดค้างที่รูป QR แล้วเลือกบันทึก
       </div>
-
-      <ul class="steps">
-        <li><span class="num">1</span><span>เปิด<span class="hl">แอปธนาคาร</span> แล้วสแกน QR ด้านบน — จ่ายด้วยเครื่องเดียวกันให้<span class="hl">บันทึกรูปแล้วสแกนจากอัลบั้ม</span> (ยอดเงินขึ้นให้อัตโนมัติ)</span></li>
-        <li><span class="num">2</span><span>โอนเงิน <span class="hl">399 บาท</span> แล้ว<span class="hl">บันทึกภาพสลิป</span></span></li>
-        <li><span class="num">3</span><span>กลับไปที่<span class="hl">แชท LINE Prinnie333</span> แล้ว<span class="hl">ส่งรูปสลิป</span>เข้ามาในแชท</span></li>
-        <li><span class="num">✓</span><span>ทีมงานตรวจสอบและ<span class="hl">เปิดใช้งานสมาชิกให้ภายใน 24 ชม.</span> 🌟</span></li>
-      </ul>
-
-      <div class="note">โอนเรียบร้อยแล้วส่งสลิปในแชทได้เลย ปิดหน้านี้ได้ค่ะ ✨</div>
       <div class="ref" id="ref"></div>
     </div>
   </div>

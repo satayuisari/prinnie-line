@@ -125,7 +125,8 @@
       </div>
       <div style="font-size:22px;font-weight:800;margin-top:12px">399 บาท / เดือน</div>
     </div>
-    <button class="btn" id="payBtn2" onclick="goToPayment('payBtn2')">ไปหน้าจ่ายเงิน →</button>
+    <!-- ปกติหน้าจ่ายเงินเปิดให้อัตโนมัติ ปุ่มนี้ไว้กดซ้ำถ้าเบราว์เซอร์บล็อกการเปิดหน้าต่าง -->
+    <button class="btn" id="payBtn2" onclick="goToPayment('payBtn2')">เปิดหน้าจ่ายเงินอีกครั้ง →</button>
     <button class="btn btn-ghost" onclick="showStep('step-form')">แก้ไขข้อมูลวันเกิด</button>
   </div>
 
@@ -260,7 +261,12 @@
     // คนที่ลงทะเบียนดวงไว้แล้วไม่ต้องกรอกฟอร์มซ้ำ → เข้าหน้าจ่ายเงินเลย เหลือกดครั้งเดียว
     // (เดิมเด้งมาที่ฟอร์มวันเกิด ลูกค้าเข้าใจว่าให้สมัครใหม่ แล้วก็ปิดหนีไป)
     if (getView() === 'pay') {
-      if (hasChart) { showStep('step-pay'); return; }
+      if (hasChart) {
+        // เปิดหน้าจ่ายเงินให้เลย ไม่ต้องกดอะไรอีก — ลูกค้ากดปุ่มในแชทแล้ว = ตัดสินใจแล้ว
+        showStep('step-pay');
+        goToPayment('payBtn2');
+        return;
+      }
       // ยังไม่มีดวง → ต้องลงทะเบียนก่อนถึงจ่ายได้ ปล่อยให้เห็นฟอร์มตามปกติ
     }
 
