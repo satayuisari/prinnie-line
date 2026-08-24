@@ -49,8 +49,18 @@ async function verify(imageBuffer, expectedTHB) {
     if (j.success && j.data) {
       return { ok: true, amount: Number(j.data.amount), ref: j.data.transRef || null, data: j.data };
     }
-    // 1010/1012 = สลิปซ้ำ, 1013 = ยอดไม่ตรง
-    return { ok: false, code: j.code, dup: j.code === 1012 || j.code === 1010, reason: j.message || `code ${j.code}` };
+    // ⚠️ เคยแปล 1010 เป็น "สลิปซ้ำ" ซึ่งผิด — 1010 คือ "ยังตรวจไม่ได้ ให้รอสักครู่"
+    //    (เช่น สลิปธนาคารกรุงเทพต้องรอ ~7 นาทีหลังโอน) ลูกค้าที่เพิ่งโอนเลยโดนตอบว่า
+    //    "สลิปนี้เคยใช้ไปแล้ว" ทั้งที่ยังไม่เคยใช้ — ต้องแยกสองเคสนี้ออกจากกัน
+    const msg = j.message || `code ${j.code}`;
+    const retryLater = j.code === 1010 || /กรุณารอ|รอการตรวจสอบ/.test(msg);
+    return {
+      ok: false,
+      code: j.code,
+      retryLater,
+      dup: !retryLater && j.code === 1012,     // ซ้ำจริงเท่านั้น
+      reason: msg,
+    };
   } catch (e) {
     return { ok: false, reason: e.message };
   }

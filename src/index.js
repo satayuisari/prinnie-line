@@ -20,6 +20,7 @@ const perfReport    = require('./scheduler/perfReport');
 const pendingOrders = require('./scheduler/pendingOrders');
 const loyalty       = require('./scheduler/loyaltyRewards');
 const winbackBlast  = require('./scheduler/winbackBlast');
+const slipRecheck   = require('./scheduler/slipRecheck');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -69,6 +70,7 @@ perfReport.start();
 pendingOrders.start();
 loyalty.start();
 winbackBlast.start();
+slipRecheck.start();
 
 const mode = process.env.TEST_MODE === 'true' ? '🧪 TEST_MODE (push เฉพาะ allowlist)' : '🚀 PRODUCTION';
 app.listen(PORT, () => {
