@@ -1,5 +1,5 @@
 // ปลดล็อกดวงคู่ (หลังชำระเงินสำเร็จ) — คำนวณดวงคู่จากข้อมูลใน order.payload แล้ว push ผลเต็ม
-// ใช้ร่วมกันได้ทั้ง staff อนุมัติสลิป (PromptPay) และ webhook เดิม (Beam)
+// เรียกจากขั้นตอน staff อนุมัติสลิป (PromptPay) บน dashboard
 const subscribers   = require('./subscriberService');
 const synastry      = require('./synastryService');
 const geocoding     = require('./geocodingService');

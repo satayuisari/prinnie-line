@@ -1,4 +1,4 @@
-// คำสั่งซื้อที่รอชำระ (Beam) — สร้าง ref, เก็บข้อมูล, mark paid แบบ idempotent
+// คำสั่งซื้อที่รอชำระ (PromptPay) — สร้าง ref, เก็บข้อมูล, mark paid แบบ idempotent
 const crypto = require('crypto');
 const db = require('../db');
 
@@ -7,7 +7,7 @@ function newRef(type) {
   return `${type === 'couple' ? 'cpl' : 'sub'}_${crypto.randomBytes(8).toString('hex')}`;
 }
 
-async function create({ type, line_user_id, amount, payload, method = 'beam' }) {
+async function create({ type, line_user_id, amount, payload, method = 'promptpay' }) {
   const ref = newRef(type);
   await db.query(
     `INSERT INTO payment_orders (ref, type, line_user_id, amount, payload, method)

@@ -4,7 +4,6 @@ const subscribers = require('../services/subscriberService');
 const horoscope   = require('../services/horoscopeService');
 const synastry    = require('../services/synastryService');
 const geocoding   = require('../services/geocodingService');
-const beamService = require('../services/beamService');
 const promptpay   = require('../services/promptpayService');
 const orders      = require('../services/paymentOrders');
 const coupleCard  = require('../services/coupleCard');
@@ -162,11 +161,11 @@ router.post('/synastry', requireAuth, async (req, res) => {
       // สมาชิก → อ่านเต็ม ฟรี
       return res.json({ ...base, locked: false, reading });
     }
-    // คนไม่ใช่สมาชิก → teaser (% + มุมดี 1 บรรทัด) + ราคา 149
+    // คนไม่ใช่สมาชิก → teaser (% + มุมดี 1 บรรทัด) + ราคาปลดล็อกดวงคู่
     return res.json({
       ...base,
       locked: true,
-      price: beamService.COUPLE_PRICE_THB,
+      price: promptpay.COUPLE_PRICE_THB,
       teaser: synastry.pickTeaser(reading.aspects),
     });
   } catch (err) {
