@@ -1,4 +1,5 @@
 const line        = require('@line/bot-sdk');
+const assetHost = require('../services/assetHost');
 const subscribers = require('../services/subscriberService');
 const horoscope   = require('../services/horoscopeService');
 const { replyMessage, isAllowed, TEST_MODE, client, getMessageContent, notifyAdmins } = require('../services/lineMessaging');
@@ -77,9 +78,10 @@ function formatReading(reading, title, nickname) {
 }
 
 // สร้าง array ข้อความ: ถ้ามีรูปไพ่ → ส่งรูปนำหน้า แล้วตามด้วยข้อความ+quick reply
+// โฮสต์รูปล่มอยู่ = ข้ามรูปไป ส่งกรอบเสียให้ลูกค้าแย่กว่าไม่ส่งรูป (ชื่อไพ่อยู่ในข้อความแล้ว)
 function buildMessages(reading, title, nickname) {
   const msgs = [];
-  if (reading.tarot && reading.tarot.image) {
+  if (reading.tarot && reading.tarot.image && assetHost.isUp()) {
     msgs.push({ type: 'image', originalContentUrl: reading.tarot.image, previewImageUrl: reading.tarot.image });
   }
   msgs.push(textQR(formatReading(reading, title, nickname)));
@@ -322,7 +324,7 @@ async function handleEvent(event) {
         const t = await horoscope.smartTarot({ userId: sub.line_user_id, period: 'daily', date: new Date() });
         if (!t) return replyMessage(event.replyToken, { type: 'text', text: 'ไม่มีไพ่ในขณะนี้' });
         const msgs = [];
-        if (t.image) msgs.push({ type: 'image', originalContentUrl: t.image, previewImageUrl: t.image });
+        if (t.image && assetHost.isUp()) msgs.push({ type: 'image', originalContentUrl: t.image, previewImageUrl: t.image });
         msgs.push({ type: 'text', text: `🃏 ${t.name}\n\n${t.text}`.slice(0, 4900) });
         return replyMessage(event.replyToken, msgs);
       }
