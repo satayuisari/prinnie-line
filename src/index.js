@@ -42,6 +42,9 @@ beamWebhook.register(app);  // Beam (ชำระเงิน)
 app.use(bodyParser.json());
 app.use(express.static('liff'));
 
+// เฝ้าโฮสต์รูปไพ่ — ล่มเมื่อไหร่ให้งดแนบรูปอัตโนมัติ ไม่ส่งกรอบเสียให้ลูกค้า
+require('./services/assetHost').start();
+
 // จำกัดอัตราคำขอ กันยิงถล่ม (signup/geocode/render รูป = แพง) — webhook ไม่โดนเพราะ register ไปก่อนแล้ว
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, max: 100,
