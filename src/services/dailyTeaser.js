@@ -2,7 +2,6 @@
 // โชว์ว่าดวงเขาคำนวณเสร็จ (อาทิตย์/จันทร์ของเขาจริง + ไพ่ของเขา) แต่ปิดคำทำนายไว้ → ล่อสมัคร
 // ใช้ทั้งตอนกดดูดวง (webhook) และ push 8 โมงเช้า (scheduler)
 const horoscope = require('./horoscopeService');
-const assetHost = require('./assetHost');
 
 const LIFF_URL = process.env.LINE_LIFF_ID
   ? `https://liff.line.me/${process.env.LINE_LIFF_ID}?view=pay`
@@ -37,7 +36,7 @@ async function build(chart, nickname, date = new Date()) {
 
   const msgs = [];
   // โชว์ "รูปไพ่ของเขา" ได้ (เป็น hook) แต่ความหมายล็อก
-  if (reading.tarot && reading.tarot.image && assetHost.isUp()) {
+  if (reading.tarot && reading.tarot.image) {
     msgs.push({ type: 'image', originalContentUrl: reading.tarot.image, previewImageUrl: reading.tarot.image });
   }
   msgs.push({
@@ -69,7 +68,7 @@ async function buildFreeFullDay(chart, nickname, date = new Date()) {
     'อยากอ่านดวงส่วนตัวเต็ม ๆ ทุกเช้า 8 โมง? สมัครสมาชิก 399 บาท/เดือน',
     `👉 ${LIFF_URL}`);
   const msgs = [];
-  if (reading.tarot && reading.tarot.image && assetHost.isUp()) {
+  if (reading.tarot && reading.tarot.image) {
     msgs.push({ type: 'image', originalContentUrl: reading.tarot.image, previewImageUrl: reading.tarot.image });
   }
   msgs.push({
@@ -131,7 +130,7 @@ async function buildCombined(period, chart, nickname, date = new Date(), { locke
   }
 
   const msgs = [];
-  if (tarot && tarot.image && assetHost.isUp()) msgs.push({ type: 'image', originalContentUrl: tarot.image, previewImageUrl: tarot.image });
+  if (tarot && tarot.image) msgs.push({ type: 'image', originalContentUrl: tarot.image, previewImageUrl: tarot.image });
   const m = { type: 'text', text: lines.join('\n').slice(0, 4900) };
   if (locked) m.quickReply = { items: [{ type: 'action', action: { type: 'uri', label: '🔓 ปลดล็อก สมัคร 399', uri: LIFF_URL } }] };
   else if (freeDay) m.quickReply = { items: [{ type: 'action', action: { type: 'uri', label: '✨ สมัครอ่านต่อ 399', uri: LIFF_URL } }] };
