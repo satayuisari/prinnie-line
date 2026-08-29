@@ -7,7 +7,14 @@
 // ตรวจเป็นระยะในพื้นหลัง แล้วให้ isUp() อ่านค่าที่แคชไว้แบบ sync
 // (จุดที่เรียกใช้เป็นฟังก์ชัน sync ทั้งหมด ไม่ต้องแก้ลายเซ็นให้ลามไปทั้งไฟล์)
 
+const path = require('path');
+const fs = require('fs');
+
 const HOST = process.env.ASSET_HOST || 'https://data.prinnie333.com';
+// การ์ดสำรองที่วาดไว้เอง เสิร์ฟจากแอปนี้ (assets/tarot-cards) — ไม่พึ่งเครื่องอื่น
+const CARDS_DIR = path.join(__dirname, '..', '..', 'assets', 'tarot-cards');
+const PUBLIC_BASE = (process.env.PUBLIC_BASE_URL
+  || `https://${process.env.RAILWAY_PUBLIC_DOMAIN || 'prinnie-app-production.up.railway.app'}`).replace(/\/$/, '');
 const PROBE_URL = `${HOST}/server/health`;
 const EVERY_MS = 3 * 60 * 1000;
 const TIMEOUT_MS = 5000;
@@ -40,7 +47,30 @@ async function probe() {
 }
 
 function isUp() { return up; }
-function status() { return { host: HOST, up, checked, lastChange }; }
+
+// มีการ์ดสำรองของไพ่ใบนี้ไหม — เช็คไฟล์จริงบนดิสก์ แคชผลไว้ (ไฟล์ไม่เปลี่ยนระหว่างรัน)
+let cardSet = null;
+function hasCard(imageId) {
+  if (cardSet === null) {
+    try { cardSet = new Set(fs.readdirSync(CARDS_DIR).map(f => f.replace(/\.[^.]+$/, ''))); }
+    catch { cardSet = new Set(); }
+  }
+  return cardSet.has(imageId);
+}
+
+// 🔑 กฎเลือกรูปไพ่ อยู่ที่เดียวทั้งระบบ:
+//   โฮสต์ต้นฉบับใช้ได้ → ใช้รูปต้นฉบับของอาจารย์ (ดีที่สุดเสมอ)
+//   โฮสต์ล่ม แต่มีการ์ดสำรอง → ใช้การ์ดสำรอง
+//   ไม่มีทั้งคู่ → null แล้วให้คนเรียกข้ามการแนบรูปไป
+function imageUrl(imageId) {
+  if (!imageId) return null;
+  if (up) return `${HOST}/assets/${imageId}`;
+  return hasCard(imageId) ? `${PUBLIC_BASE}/tarot/${imageId}.jpg` : null;
+}
+
+function status() {
+  return { host: HOST, up, checked, lastChange, cards: (cardSet || (hasCard(''), cardSet)).size };
+}
 
 function start() {
   probe().catch(() => {});
@@ -49,4 +79,4 @@ function start() {
   return t;
 }
 
-module.exports = { isUp, status, probe, start, HOST };
+module.exports = { isUp, imageUrl, hasCard, status, probe, start, HOST, CARDS_DIR };

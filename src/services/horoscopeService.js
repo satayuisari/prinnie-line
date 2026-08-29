@@ -1,4 +1,5 @@
 const db = require('../db');
+const assetHost = require('./assetHost');
 const { transitingPositions } = require('../astro/natalChart');
 const { transitAspects } = require('../astro/aspects');
 
@@ -200,7 +201,7 @@ async function tarotByType(type) {
   );
   if (!r.rows[0]) return null;
   const image = r.rows[0].image_id
-    ? `https://data.prinnie333.com/assets/${r.rows[0].image_id}`   // รูปไพ่เดิมจาก Directus
+    ? assetHost.imageUrl(r.rows[0].image_id)   // ต้นฉบับ Directus · ล่มแล้วใช้การ์ดสำรองในแอป
     : null;
   return { name: r.rows[0].name || 'ไพ่ประจำช่วง', text: stripHtml(r.rows[0].description), image };
 }
@@ -448,7 +449,7 @@ function toCard(row, pool) {
   return {
     name: row.name,
     text: stripHtml(row.description),
-    image: row.image_id ? `https://data.prinnie333.com/assets/${row.image_id}` : null,
+    image: assetHost.imageUrl(row.image_id),
     theme: ['love', 'work', 'money'].includes(pool) ? pool : null,
   };
 }

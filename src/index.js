@@ -40,7 +40,11 @@ webhook.register(app);      // LINE
 app.use(bodyParser.json());
 app.use(express.static('liff'));
 
-// เฝ้าโฮสต์รูปไพ่ — ล่มเมื่อไหร่ให้งดแนบรูปอัตโนมัติ ไม่ส่งกรอบเสียให้ลูกค้า
+// การ์ดไพ่สำรองที่วาดไว้เอง — LINE ต้องดึงผ่าน https สาธารณะ จึงต้องเสิร์ฟจากที่นี่
+// แคชยาวได้ ไฟล์ไม่เปลี่ยน (ชื่อไฟล์คือ image_id ซึ่งไม่ซ้ำและไม่ถูกเขียนทับ)
+app.use('/tarot', express.static('assets/tarot-cards', { maxAge: '30d', immutable: true }));
+
+// เฝ้าโฮสต์รูปไพ่ — ล่ม → สลับไปใช้การ์ดสำรอง · กลับมา → ใช้ต้นฉบับเอง
 require('./services/assetHost').start();
 
 // จำกัดอัตราคำขอ กันยิงถล่ม (signup/geocode/render รูป = แพง) — webhook ไม่โดนเพราะ register ไปก่อนแล้ว

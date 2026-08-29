@@ -25,3 +25,6 @@ cowork/poc/cloudflared.exe
 # DB ชั่วคราวของเทส (สร้างใหม่ทุกครั้งที่รัน npm test)
 .pglite-test*
 .pglite-preview
+
+# การ์ดไพ่ชั่วคราวรุ่นแรก (ลายดาว) — เลิกใช้แล้ว ใช้ assets/tarot-cards แทน
+assets/tarot-placeholder/
