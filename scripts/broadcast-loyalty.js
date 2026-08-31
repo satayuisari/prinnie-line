@@ -1,0 +1,118 @@
+// บรอดแคสต์แคมเปญ "ดวงเลือกคุณ" — ดูข้อความก่อนเสมอ ไม่ส่งจนกว่าจะสั่งชัด ๆ
+//
+//   node scripts/broadcast-loyalty.js                  พิมพ์ข้อความออกมาดู (ไม่ส่งอะไรเลย)
+//   node scripts/broadcast-loyalty.js --to-me          ส่งเข้าไลน์ตัวเองดูของจริงก่อน
+//   node scripts/broadcast-loyalty.js --send oa1       บรอดแคสต์เข้า @prinnie333 (บัญชีบริการ)
+//   node scripts/broadcast-loyalty.js --send oa2       บรอดแคสต์เข้าบัญชีใหญ่ @efb2738a
+//   node scripts/broadcast-loyalty.js --send both      ทั้งสองบัญชี
+//
+// ⚠️ --send ยิงหาผู้ติดตามจริงทั้งหมด ย้อนกลับไม่ได้ ต้องพิมพ์ยืนยันอีกครั้ง
+// TEST_MODE=true จะบล็อกให้เองอีกชั้น (ตาม lineMessaging.js)
+//
+// คำที่ใช้ยึดตาม marketing/LOYALTY-CAMPAIGN.md เท่านั้น
+//   ✅ ดวงเลือกคุณ · คัดจากดวงกำเนิด   ❌ ผู้โชคดี · จับรางวัล · สุ่ม · ลุ้น · ประกาศผล
+
+require('dotenv').config();
+const readline = require('readline');
+const lm = require('../src/services/lineMessaging');
+
+const BASE = (process.env.PUBLIC_BASE_URL || 'https://prinnie-app-production.up.railway.app').replace(/\/$/, '');
+const IMG = `${BASE}/duang-luek-khun.jpg`;      // ต้องมีไฟล์นี้ใน liff/ (เสิร์ฟเป็น static)
+
+// ── บัญชีบริการ @prinnie333 — คนที่นี่รู้จักเราแล้ว พูดเรื่องสิทธิ์ได้เลย ──
+const TEXT_OA1 =
+`🔮 เดือนนี้ ดวงของคุณอาจเป็นดวงที่ดาวเลือก
+
+ทุกวันที่ 15 ระบบจะคำนวณว่าดาวจรเดือนนั้น
+ทำมุมกับดวงกำเนิดของสมาชิกคนไหนแรงที่สุด
+คนนั้นได้คุยกับอาจารย์ปรินนี่ตัวต่อตัว 1 ชั่วโมง
+
+ไม่ใช่การจับรางวัล ไม่ต้องลุ้น ไม่ต้องรอคิว
+เป็นสมาชิกครบ 14 วัน ดวงคุณก็เข้าไปอยู่ในการคำนวณแล้ว
+
+━━━━━━━━━━━━━━
+สมัครสมาชิก → ครบ 14 วัน → ดวงเข้าคำนวณเอง
+━━━━━━━━━━━━━━
+
+สมาชิก 399 บาท/เดือน
+ทักมาได้เลยค่ะ เดือนนี้อาจเป็นคุณ ✨`;
+
+// ── บัญชีใหญ่ @efb2738a — คนที่นี่อาจยังไม่รู้จักบริการ ต้องอธิบายก่อนแล้วชี้ทาง ──
+const TEXT_OA2 =
+`🔮 ดวงของทุกคนไม่เหมือนกัน — เดือนนี้ดาวจึงเลือกไม่เหมือนกัน
+
+อาจารย์ปรินนี่เปิดสิทธิ์พิเศษให้สมาชิก Prinnie333
+ทุกวันที่ 15 ระบบคำนวณว่าดาวจรเดือนนั้นทำมุมกับ
+ดวงกำเนิดของสมาชิกคนไหนแรงที่สุด
+คนนั้นได้คุยกับอาจารย์ตัวต่อตัว 1 ชั่วโมง
+
+ไม่ใช่การจับรางวัล — คัดจากดวงกำเนิดของคุณเอง
+คำนวณด้วยวัน เวลา และสถานที่เกิดจริง
+
+━━━━━━━━━━━━━━
+สมัครสมาชิก → ครบ 14 วัน → ดวงเข้าคำนวณเอง
+━━━━━━━━━━━━━━
+
+แอด LINE @prinnie333 เพื่อสมัครและรับพื้นดวงส่วนตัวฟรี
+เดือนนี้อาจเป็นคุณ ✨`;
+
+const msgs = (text) => ([
+  { type: 'image', originalContentUrl: IMG, previewImageUrl: IMG },
+  { type: 'text', text },
+]);
+
+const arg = (n) => { const i = process.argv.indexOf(n); return i >= 0 ? process.argv[i + 1] : null; };
+const SEND = arg('--send');
+const TO_ME = process.argv.includes('--to-me');
+
+function show() {
+  const line = '─'.repeat(58);
+  console.log(`\nรูปที่จะแนบ: ${IMG}\n`);
+  for (const [name, t] of [['@prinnie333 (บัญชีบริการ)', TEXT_OA1], ['@efb2738a (บัญชีใหญ่)', TEXT_OA2]]) {
+    console.log(line);
+    console.log(`  ${name}   ·   ${t.length} ตัวอักษร`);
+    console.log(line);
+    console.log(t.split('\n').map(l => '  ' + l).join('\n'));
+    console.log();
+  }
+  console.log(line);
+  console.log('  ยังไม่ได้ส่งอะไรทั้งสิ้น');
+  console.log('  --to-me       ส่งเข้าไลน์ตัวเองดูของจริง');
+  console.log('  --send oa1 | oa2 | both     บรอดแคสต์จริง (ต้องยืนยันอีกครั้ง)');
+  console.log(line + '\n');
+}
+
+function ask(q) {
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  return new Promise(r => rl.question(q, a => { rl.close(); r(a.trim()); }));
+}
+
+(async () => {
+  if (!SEND && !TO_ME) { show(); return; }
+
+  if (TO_ME) {
+    const me = process.env.PROD_OA_USER_ID || (process.env.TEST_USER_IDS || '').split(',')[0].trim();
+    if (!me) { console.error('ไม่รู้ว่าจะส่งหาใคร — ตั้ง PROD_OA_USER_ID หรือ TEST_USER_IDS ก่อน'); process.exit(1); }
+    await lm.pushMessage(me, msgs(TEXT_OA1));
+    console.log(`✓ ส่งตัวอย่าง (แบบบัญชีบริการ) เข้าไลน์คุณแล้ว — ${me.slice(0, 8)}…`);
+    try { await lm.pushOA2(me, msgs(TEXT_OA2)); console.log('✓ ส่งตัวอย่าง (แบบบัญชีใหญ่) ผ่าน OA2 แล้ว'); }
+    catch (e) { console.log('· ข้ามตัวอย่าง OA2:', e.message); }
+    return;
+  }
+
+  if (!['oa1', 'oa2', 'both'].includes(SEND)) { console.error('--send ต้องเป็น oa1 · oa2 · both'); process.exit(1); }
+  show();
+  const targets = SEND === 'both' ? ['oa1', 'oa2'] : [SEND];
+  const names = { oa1: '@prinnie333 (บัญชีบริการ ~10,000 คน)', oa2: '@efb2738a (บัญชีใหญ่)' };
+  console.log('⚠️  กำลังจะบรอดแคสต์จริงไปที่: ' + targets.map(t => names[t]).join(' และ '));
+  console.log('   ส่งแล้วเรียกคืนไม่ได้ และ LINE นับเป็น 1 ข้อความต่อคน (กินโควต้า)\n');
+  const ok = await ask('   พิมพ์ "ส่งเลย" เพื่อยืนยัน · อย่างอื่นคือยกเลิก: ');
+  if (ok !== 'ส่งเลย') { console.log('\n   ยกเลิกแล้ว ไม่ได้ส่งอะไร'); return; }
+
+  for (const t of targets) {
+    try {
+      if (t === 'oa1') { await lm.broadcast(msgs(TEXT_OA1)); console.log('   ✓ ส่งเข้า @prinnie333 แล้ว'); }
+      else { await lm.broadcastOA2(msgs(TEXT_OA2)); console.log('   ✓ ส่งเข้าบัญชีใหญ่แล้ว'); }
+    } catch (e) { console.error(`   ✗ ${t} ล้มเหลว:`, e.message); }
+  }
+})();
