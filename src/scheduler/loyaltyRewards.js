@@ -1,4 +1,4 @@
-// "ดวงเลือกคุณ" — รันทุกวันที่ 15 เวลา 09:00 Bangkok
+// "ดวงเลือกคุณ" — รันทุก 15 วัน (วันที่ 2 และ 17) เวลา 09:00 Bangkok
 // หาสมาชิกที่ดาวจรเดือนนี้ทำมุมกับดวงกำเนิดแรงที่สุด → ให้สิทธิ์ดูดวงกับอาจารย์ 1 ชม.
 //
 // ⚖️ ไม่มีการสุ่ม — คำนวณจากตำแหน่งดาวจริง รันซ้ำวันเดิมได้ผลเดิมเสมอ (ดู monthlyPick.js)
@@ -52,11 +52,12 @@ async function runMonthlyPick({ at = new Date(), dryRun = false } = {}) {
 }
 
 function start() {
-  // วันที่ 15 ของทุกเดือน 09:00 Bangkok
-  cron.schedule('0 9 15 * *', () => runMonthlyPick(), { timezone: 'Asia/Bangkok' });
+  // วันที่ 2 และ 17 ของทุกเดือน 09:00 Bangkok — รอบละ 15 วัน
+  // ต้องตรงกับที่บอกไว้ในข้อความบรอดแคสต์ ไม่งั้นสัญญากับลูกค้าไม่เป็นจริง
+  cron.schedule('0 9 2,17 * *', () => runMonthlyPick(), { timezone: 'Asia/Bangkok' });
   const state = process.env.LOYALTY_ENABLED === 'true'
     ? '(ENABLED)' : '(ปิดอยู่ — ตั้ง LOYALTY_ENABLED=true)';
-  console.log(`[ดวงเลือกคุณ] คัดผู้ได้รับทุกวันที่ 15 · 09:00 Bangkok · สมาชิกครบ ${pick.MIN_MEMBER_DAYS} วัน ${state}`);
+  console.log(`[ดวงเลือกคุณ] คัดผู้ได้รับทุก 15 วัน (วันที่ 2 และ 17) · 09:00 Bangkok · สมาชิกครบ ${pick.MIN_MEMBER_DAYS} วัน ${state}`);
 }
 
 module.exports = { start, runMonthlyPick };

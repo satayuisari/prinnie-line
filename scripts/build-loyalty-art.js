@@ -91,12 +91,12 @@ function overlay(W, H, showPrice) {
   <g>
     <line x1="${cx - 162 * S}" y1="${70 * S}" x2="${cx - 88 * S}" y2="${70 * S}" stroke="#E8C77A" stroke-opacity=".5" stroke-width="1.2"/>
     <line x1="${cx + 88 * S}" y1="${70 * S}" x2="${cx + 162 * S}" y2="${70 * S}" stroke="#E8C77A" stroke-opacity=".5" stroke-width="1.2"/>
-    <text x="${cx}" y="${78 * S}" text-anchor="middle" font-size="${stamp}" font-weight="700" fill="#E8C77A" letter-spacing="4">ทุกวันที่ 15</text>
+    <text x="${cx}" y="${78 * S}" text-anchor="middle" font-size="${stamp}" font-weight="700" fill="#E8C77A" letter-spacing="4">ทุก 15 วัน</text>
   </g>
 
   <text x="${cx}" y="${headY}" text-anchor="middle" font-size="${head}" font-weight="700" fill="url(#gold)">ดวงเลือกคุณ</text>
 
-  <text x="${cx}" y="${proY}" text-anchor="middle" font-size="${promise}" font-weight="500" fill="#FFFFFF">ดาวเลือกดวงที่แรงที่สุดในเดือนนั้น</text>
+  <text x="${cx}" y="${proY}" text-anchor="middle" font-size="${promise}" font-weight="500" fill="#FFFFFF">ดาวเลือกดวงที่แรงที่สุดในรอบนั้น</text>
   <text x="${cx}" y="${proY2}" text-anchor="middle" font-size="${promise}" font-weight="500" fill="#FFFFFF">คนนั้นได้คุยกับอาจารย์ปรินนี่ 1 ชั่วโมง</text>
 
   <!-- ทางเข้าร่วม — เป็นลำดับจริง ต้องทำตามกัน ลูกศรจึงบอกความหมาย -->
