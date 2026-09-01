@@ -186,11 +186,11 @@ router.post('/couple-checkout', requireAuth, async (req, res) => {
   const { partner_name, birth_date, birth_time, birth_place, lat, lng } = req.body;
   if (!birth_date) return res.status(400).json({ error: 'ต้องส่งวันเกิดของคู่' });
   try {
-    const ref = await orders.create({
+    // ใช้ใบเดิมที่ยังไม่ส่งสลิปต่อ + ทับข้อมูลคู่ด้วยของที่เพิ่งกรอก (กดซ้ำ = ใบเดียว)
+    const ref = await orders.createOrReuse({
       type: 'couple',
       line_user_id: req.line.userId,
       amount: promptpay.COUPLE_PRICE_THB * 100,
-      method: 'promptpay',
       payload: { partner_name, birth_date, birth_time, birth_place, lat, lng },
     });
     res.json({ url: `${baseUrl(req)}/pay.html?ref=${ref}` });

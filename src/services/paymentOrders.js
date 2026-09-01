@@ -2,6 +2,10 @@
 const crypto = require('crypto');
 const db = require('../db');
 
+// อายุที่ยังถือว่าออเดอร์ "กำลังจ่ายอยู่" — ใช้ทั้งตอนใช้ใบเดิมซ้ำ และตอนรับสลิป
+// เกินจากนี้ = ความพยายามที่ตายแล้ว ไม่ควรเอาสลิป/รูปของลูกค้าไปผูกให้
+const ORDER_TTL_HOURS = 72;
+
 // ref สั้น อ่านง่ายใน dashboard: <type>_<random>
 function newRef(type) {
   return `${type === 'couple' ? 'cpl' : 'sub'}_${crypto.randomBytes(8).toString('hex')}`;
@@ -17,6 +21,29 @@ async function create({ type, line_user_id, amount, payload, method = 'promptpay
   return ref;
 }
 
+// กดปุ่ม "สมัครสมาชิก" ซ้ำ ไม่ควรได้ออเดอร์ใบใหม่ทุกครั้ง — ใช้ใบเดิมที่ยังไม่ส่งสลิปต่อ
+//
+// ⚠️ บั๊กที่เกิดจริง: 41 จาก 111 ลูกค้าสร้างออเดอร์ซ้ำ (สูงสุด 11 ใบ/คน) และ 10 คน
+//    มีใบค้างพร้อมกันหลายใบ ใบค้างพวกนี้ไปดักสลิป/รูปที่ลูกค้าส่งทีหลัง แล้วตอบผิด ๆ
+//    ว่า "สลิปนี้เคยใช้ไปแล้ว" / "รูปนี้อ่านไม่ออก" ทั้งที่เขาเป็นสมาชิกเรียบร้อยแล้ว
+//    + ทำให้คิวอนุมัติบน dashboard รกจนของจริงจม
+async function createOrReuse({ type, line_user_id, amount, payload }) {
+  const r = await db.query(
+    `UPDATE payment_orders
+        SET payload = COALESCE($4::jsonb, payload), created_at = NOW(), reminded_at = NULL
+      WHERE ref = (
+        SELECT ref FROM payment_orders
+         WHERE line_user_id = $1 AND type = $2 AND amount = $3
+           AND method = 'promptpay' AND status = 'PENDING' AND slip_message_id IS NULL
+           AND created_at > NOW() - ($5 || ' hours')::interval
+         ORDER BY created_at DESC LIMIT 1)
+      RETURNING ref`,
+    [line_user_id, type, amount, payload ? JSON.stringify(payload) : null, String(ORDER_TTL_HOURS)]
+  );
+  if (r.rows[0]) return r.rows[0].ref;
+  return create({ type, line_user_id, amount, payload });
+}
+
 async function get(ref) {
   const r = await db.query('SELECT * FROM payment_orders WHERE ref = $1', [ref]);
   return r.rows[0] || null;
@@ -24,6 +51,9 @@ async function get(ref) {
 
 // แนบสลิป: หา PromptPay order ที่ยังค้าง (PENDING) ล่าสุดของ user แล้วผูก messageId ของรูปสลิป
 // คืน order ที่อัปเดต (ไว้ ack ลูกค้า) หรือ null ถ้าไม่มีออเดอร์ค้าง (รูปทั่วไป ไม่ใช่สลิป)
+//
+// ⚠️ ต้องจำกัดอายุออเดอร์ ไม่งั้นใบค้างเก่า ๆ จะดักรูปทุกใบที่ลูกค้าส่งเข้ามาตลอดไป
+//    (สมาชิกที่จ่ายแล้วส่งรูปเล่น ๆ ในแชท จะโดนบอทตอบเรื่องสลิป — เคยเจอจริง)
 async function attachSlip(line_user_id, messageId) {
   const r = await db.query(
     `UPDATE payment_orders
@@ -31,10 +61,11 @@ async function attachSlip(line_user_id, messageId) {
      WHERE ref = (
        SELECT ref FROM payment_orders
        WHERE line_user_id = $1 AND method = 'promptpay' AND status = 'PENDING'
+         AND created_at > NOW() - ($3 || ' hours')::interval
        ORDER BY created_at DESC LIMIT 1
      )
      RETURNING *`,
-    [line_user_id, messageId]
+    [line_user_id, messageId, String(ORDER_TTL_HOURS)]
   );
   return r.rows[0] || null;
 }
@@ -64,4 +95,6 @@ async function markPaid(ref, chargeId) {
   return r.rows.length > 0;
 }
 
-module.exports = { create, get, markPaid, attachSlip, listPendingPromptpay };
+module.exports = {
+  create, createOrReuse, get, markPaid, attachSlip, listPendingPromptpay, ORDER_TTL_HOURS,
+};

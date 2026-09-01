@@ -22,11 +22,11 @@ function publicBase() {
 router.post('/create-promptpay', requireAuth, async (req, res) => {
   if (!promptpay.isEnabled()) return res.status(410).json(PAYMENT_DISABLED);
   try {
-    const ref = await orders.create({
+    // ใช้ใบเดิมที่ยังไม่ส่งสลิปต่อ (กดปุ่มซ้ำไม่ควรได้ออเดอร์ใบใหม่ทุกครั้ง)
+    const ref = await orders.createOrReuse({
       type: 'subscription',
       line_user_id: req.line.userId,
       amount: promptpay.PRICE_THB * 100,   // เก็บเป็นสตางค์
-      method: 'promptpay',
     });
     res.json({ url: `${publicBase()}/pay.html?ref=${ref}` });
   } catch (err) {
