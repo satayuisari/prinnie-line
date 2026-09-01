@@ -36,10 +36,14 @@ router.post('/create-promptpay', requireAuth, async (req, res) => {
 });
 
 // ข้อมูลออเดอร์สำหรับหน้า pay.html (ref = โทเคนสุ่ม ทำหน้าที่เป็น capability — ไม่คืนข้อมูลส่วนตัว)
+// promptpay = ข้อมูลผู้รับเงินแบบพิมพ์เองได้ (เท่ากับที่ฝังใน QR อยู่แล้ว) — ไว้ให้คนที่สแกนไม่ผ่าน
 router.get('/order/:ref', async (req, res) => {
   const o = await orders.get(req.params.ref);
   if (!o) return res.status(404).json({ error: 'not_found' });
-  res.json({ ref: o.ref, amount: o.amount, price_thb: o.amount / 100, status: o.status, type: o.type });
+  res.json({
+    ref: o.ref, amount: o.amount, price_thb: o.amount / 100, status: o.status, type: o.type,
+    promptpay: promptpay.recipient(),
+  });
 });
 
 // QR PromptPay ของออเดอร์ (จำนวนเงินฝังในคิวอาร์ → ลูกค้าสแกนแล้วยอดขึ้นเอง)
