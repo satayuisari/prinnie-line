@@ -97,7 +97,10 @@ function shouldTeaseToday(freeDailyAt, today = new Date()) {
 
 function start() {
   cron.schedule('0 8 * * *', sendDailyHoroscopes, { timezone: 'Asia/Bangkok' });
-  console.log('[Scheduler] Daily horoscope — 08:00 Bangkok time');
+  // ปิดสถานะสมาชิกที่หมดอายุ ก่อนถึงรอบส่งดวง — ให้ตัวเลขรายงานและเกณฑ์แคมเปญตรงความจริง
+  cron.schedule('5 0 * * *', () => subscribers.sweepExpired()
+    .catch(e => console.error('[sweep]', e.message)), { timezone: 'Asia/Bangkok' });
+  console.log('[Scheduler] Daily horoscope — 08:00 Bangkok time (+ ปิดสมาชิกหมดอายุ 00:05)');
 }
 
 module.exports = { start, sendDailyHoroscopes, shouldTeaseToday };

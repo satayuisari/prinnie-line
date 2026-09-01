@@ -25,7 +25,9 @@ async function member(id, birth, daysAgo = 60) {
     `UPDATE line_subscribers
         SET status='ACTIVE', payment_ref='sub_test',
             subscribe_start = $3::timestamp - ($2||' days')::interval,
-            subscribe_end   = $3::timestamp + INTERVAL '30 days'
+            -- ให้อายุสมาชิกยาวพอครอบทุกวันที่ในเทส (มีเคสจัดอันดับข้ามปีเพื่อดูดาวเคลื่อน)
+            -- เกณฑ์จริงต้องยังไม่หมดอายุ ณ วันคัดเลือก — เทสหมดอายุอยู่ในเคสของตัวเองด้านล่าง
+            subscribe_end   = $3::timestamp + INTERVAL '3 years'
       WHERE line_user_id=$1`, [id, String(daysAgo), AT.toISOString()]);
 }
 
@@ -93,6 +95,19 @@ describe('เกณฑ์ผู้มีสิทธิ์', () => {
     const ids = (await pick.rank(AT)).map(x => x.line_user_id);
     assert.ok(ids.includes('U_paid'));
     assert.ok(!ids.includes('U_founder'), 'founder ไม่ควรมาแย่งสิทธิ์ลูกค้าจริง');
+  });
+
+  // ⚠️ เจอจากข้อมูลจริง 23 ส.ค. 69: status ไม่เคยถูกเปลี่ยนกลับเป็น EXPIRED
+  //    → คนหมดอายุ 31 คนค้างเป็น ACTIVE และเข้าเกณฑ์ชิงสิทธิ์ได้ทั้งที่ไม่ใช่สมาชิกแล้ว
+  test('หมดอายุก่อนวันคัดเลือก = ไม่เข้าเกณฑ์ แม้ status ยังค้างเป็น ACTIVE', async () => {
+    await member('U_live', '1990-01-01');
+    await member('U_lapsed', '1992-02-02');
+    await db.query(
+      `UPDATE line_subscribers SET subscribe_end = $1::timestamp - INTERVAL '5 days'
+        WHERE line_user_id='U_lapsed'`, [AT.toISOString()]);
+    const ids = (await pick.rank(AT)).map(x => x.line_user_id);
+    assert.ok(ids.includes('U_live'));
+    assert.ok(!ids.includes('U_lapsed'), 'คนที่หมดอายุแล้วต้องไม่ได้สิทธิ์');
   });
 
   test('คนที่เพิ่งได้รับสิทธิ์ ต้องเว้น 12 เดือน', async () => {

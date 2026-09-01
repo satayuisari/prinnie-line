@@ -12,6 +12,8 @@ helpers.prepareEnv('payment-orders');       // ต้องมาก่อน re
 const db = require('../src/db');
 const orders = require('../src/services/paymentOrders');
 const slipRecheck = require('../src/scheduler/slipRecheck');
+const subscribers = require('../src/services/subscriberService');
+const monthlyPick = require('../src/services/monthlyPick');
 
 const SUB = { type: 'subscription', line_user_id: 'U_pay', amount: 39900 };
 const countOrders = async (where = '') =>
@@ -130,5 +132,33 @@ describe('ตาข่ายกันสลิปหาย', () => {
     const ref = await orders.createOrReuse(SUB);
     await ageOrder(ref, '3 hours');
     assert.equal((await slipRecheck.escalateStuck()).escalated, 0);
+  });
+});
+
+describe('สถานะสมาชิกหมดอายุ', () => {
+  const mkMember = (uid, endOffsetDays) => db.query(
+    `INSERT INTO line_subscribers (line_user_id, nickname, status, payment_ref,
+       subscribe_start, subscribe_end, chart_data, created_at, updated_at)
+     VALUES ($1,$1,'ACTIVE','sub_x', NOW() - INTERVAL '60 days',
+       NOW() + ($2 || ' days')::interval, '{"sun":"leo"}', NOW(), NOW())`,
+    [uid, String(endOffsetDays)]);
+
+  test('หมดอายุแล้ว → ปิดสถานะเป็น EXPIRED', async () => {
+    await mkMember('U_old', -5);
+    assert.equal((await subscribers.sweepExpired()).expired, 1);
+    assert.equal((await subscribers.getByLineUserId('U_old')).status, 'EXPIRED');
+  });
+
+  test('ยังไม่หมดอายุ → ไม่แตะ', async () => {
+    await mkMember('U_now', 10);
+    assert.equal((await subscribers.sweepExpired()).expired, 0);
+    assert.equal((await subscribers.getByLineUserId('U_now')).status, 'ACTIVE');
+  });
+
+  test('คนหมดอายุต้องไม่เข้าเกณฑ์ "ดวงเลือกคุณ" แม้ status ยังค้างเป็น ACTIVE', async () => {
+    await mkMember('U_rot', -5);      // ยังไม่ sweep → status ค้าง ACTIVE
+    await mkMember('U_live', 10);
+    const ids = (await monthlyPick.eligibleMembers()).map(m => m.line_user_id);
+    assert.deepEqual(ids, ['U_live'], 'ต้องเหลือเฉพาะคนที่ยังใช้งานได้จริง');
   });
 });

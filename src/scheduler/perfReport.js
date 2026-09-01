@@ -10,7 +10,7 @@ const ADMINS = (process.env.ADMIN_USER_IDS ||
 async function snapshot() {
   const s = (await db.query(`SELECT COUNT(*)::int total,
     COUNT(*) FILTER(WHERE chart_data IS NOT NULL)::int reg,
-    COUNT(*) FILTER(WHERE status='ACTIVE')::int active,
+    COUNT(*) FILTER(WHERE subscribe_end > NOW())::int active,   -- จาก subscribe_end ไม่ใช่ status (status ค้างได้)
     COUNT(*) FILTER(WHERE free_daily_at IS NOT NULL)::int used_free,
     COUNT(*) FILTER(WHERE created_at >= NOW()-INTERVAL '12 hours')::int new12
     FROM line_subscribers`)).rows[0];

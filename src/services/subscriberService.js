@@ -190,6 +190,23 @@ async function getActiveSubscribers() {
   return r.rows;
 }
 
+// ปิดสถานะสมาชิกที่หมดอายุแล้ว — ACTIVE → EXPIRED
+//
+// ⚠️ บั๊กที่เกิดจริง: subscription เป็นจ่ายครั้งเดียว +30 วัน ไม่มี recurring และ
+//    "ไม่มีอะไรเปลี่ยนสถานะกลับเลย" → คอลัมน์ status ค้างเป็น ACTIVE ตลอดไป
+//    ณ 23 ส.ค. 69: status='ACTIVE' 54 คน แต่ยังใช้งานได้จริงแค่ 23 คน (ค้าง 31)
+//    ผลเสีย: ตัวเลขบน dashboard/รายงานเกินจริง 2 เท่า + คนหมดอายุเข้าเกณฑ์
+//    ชิงสิทธิ์ "ดวงเลือกคุณ" ได้ทั้งที่ไม่ใช่สมาชิกแล้ว
+// (การส่งดวงรายวันไม่กระทบ — ตัวนั้นกรองด้วย subscribe_end อยู่แล้ว)
+async function sweepExpired() {
+  const r = await db.query(
+    `UPDATE line_subscribers SET status = 'EXPIRED', updated_at = NOW()
+      WHERE status = 'ACTIVE' AND (subscribe_end IS NULL OR subscribe_end <= NOW())
+      RETURNING line_user_id`);
+  if (r.rows.length) console.log(`[sweep] ปิดสถานะสมาชิกหมดอายุ ${r.rows.length} คน`);
+  return { expired: r.rows.length };
+}
+
 // เคลมสิทธิ์ "ฟรี 1 วัน" แบบ atomic — คืน true ถ้าเพิ่งได้สิทธิ์ (ยังไม่เคยใช้), false ถ้าใช้ไปแล้ว
 async function claimFreeDaily(line_user_id) {
   const r = await db.query(
@@ -217,4 +234,5 @@ async function getRegisteredInactive() {
 module.exports = {
   upsertSubscriber, getByLineUserId, getMemberStatus,
   activateSubscription, getActiveSubscribers, getRegisteredInactive, claimFreeDaily, captureFollower,
+  sweepExpired,
 };
