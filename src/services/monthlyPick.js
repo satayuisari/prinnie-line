@@ -21,7 +21,12 @@ const MIN_MEMBER_DAYS = Number(process.env.PICK_MIN_DAYS) || 14;
 const REWARD = 'ดูดวงส่วนตัวกับ อ.ปรินนี่ 1 ชั่วโมง';
 const EXPIRE_DAYS = Number(process.env.LOYALTY_EXPIRE_DAYS) || 60;
 
-const cycleOf = (d) => `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+// รอบ = ครึ่งเดือน ไม่ใช่ทั้งเดือน
+// เดิมคีย์เป็น YYYY-MM ทำให้ cron ที่ยิงวันที่ 2 และ 17 คัดได้แค่ครั้งเดียว
+// เพราะ pickForCycle เจอว่า "รอบนี้มีคนได้แล้ว" ตั้งแต่รอบวันที่ 2 → วันที่ 17 ไม่ทำอะไรเลย
+// A = วันที่ 1-16 (คัดวันที่ 2) · B = วันที่ 17 เป็นต้นไป (คัดวันที่ 17)
+const cycleOf = (d) =>
+  `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${d.getUTCDate() < 17 ? 'A' : 'B'}`;
 
 // สมาชิกที่เข้าเกณฑ์: จ่ายจริง · ยังใช้งานอยู่ · เป็นสมาชิกครบ N วัน · มีดวงกำเนิด
 // · ไม่เคยได้รับสิทธิ์ในรอบ COOLDOWN_MONTHS เดือนล่าสุด

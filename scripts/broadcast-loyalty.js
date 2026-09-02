@@ -24,9 +24,7 @@ const IMG = `${BASE}/duang-luek-khun.jpg`;      // ต้องมีไฟล�
 //   CAMPAIGN_CYCLE=15  → ใช้ตอนที่ยังไม่ deploy (production ยังเป็น 0 9 15 * *)
 //   ไม่ตั้ง            → 2 และ 17 ตาม cron ใหม่ ใช้หลัง deploy แล้วเท่านั้น
 // ถ้าบอกลูกค้าคนละวันกับที่ระบบคัดจริง = สัญญาที่ทำไม่ได้ ย้อนกลับไม่ได้ด้วย
-const CYCLE = process.env.CAMPAIGN_CYCLE === '15'
-  ? 'ระบบคำนวณใหม่ทุกวันที่ 15 ของเดือน'
-  : 'ระบบคำนวณใหม่ทุก 15 วัน\nวันที่ 2 และวันที่ 17 ของทุกเดือน';
+const CYCLE = 'รอบแรก 17 กันยายนนี้' + '\n' + 'จากนั้นทุกวันที่ 2 และ 17 ของทุกเดือน';
 
 const TEXT_OA1 =
 `🔮 เป็นสมาชิกอยู่ตอนนี้
@@ -55,10 +53,10 @@ ${CYCLE}
 
 แอด LINE @prinnie333 · รับพื้นดวงฟรี ✨`;
 
-const msgs = (text) => ([
-  { type: 'image', originalContentUrl: IMG, previewImageUrl: IMG },
-  { type: 'text', text },
-]);
+const NO_IMAGE = process.argv.includes('--no-image');
+const msgs = (text) => (NO_IMAGE
+  ? [{ type: 'text', text }]
+  : [{ type: 'image', originalContentUrl: IMG, previewImageUrl: IMG }, { type: 'text', text }]);
 
 const arg = (n) => { const i = process.argv.indexOf(n); return i >= 0 ? process.argv[i + 1] : null; };
 const SEND = arg('--send');
