@@ -20,13 +20,20 @@ const BASE = (process.env.PUBLIC_BASE_URL || 'https://prinnie-app-production.up.
 const IMG = `${BASE}/duang-luek-khun.jpg`;      // ต้องมีไฟล์นี้ใน liff/ (เสิร์ฟเป็น static)
 
 // ── บัญชีบริการ @prinnie333 — คนที่นี่รู้จักเราแล้ว พูดเรื่องสิทธิ์ได้เลย ──
+// รอบการคัดต้องตรงกับ cron ที่รันอยู่จริงบน production
+//   CAMPAIGN_CYCLE=15  → ใช้ตอนที่ยังไม่ deploy (production ยังเป็น 0 9 15 * *)
+//   ไม่ตั้ง            → 2 และ 17 ตาม cron ใหม่ ใช้หลัง deploy แล้วเท่านั้น
+// ถ้าบอกลูกค้าคนละวันกับที่ระบบคัดจริง = สัญญาที่ทำไม่ได้ ย้อนกลับไม่ได้ด้วย
+const CYCLE = process.env.CAMPAIGN_CYCLE === '15'
+  ? 'ระบบคำนวณใหม่ทุกวันที่ 15 ของเดือน'
+  : 'ระบบคำนวณใหม่ทุก 15 วัน\nวันที่ 2 และวันที่ 17 ของทุกเดือน';
+
 const TEXT_OA1 =
 `🔮 เป็นสมาชิกอยู่ตอนนี้
 คุณอาจมีสิทธิ์คุยกับอาจารย์ปรินนี่
 ตัวต่อตัว 1 ชั่วโมง ไม่มีค่าใช้จ่ายเพิ่ม
 
-ระบบคำนวณใหม่ทุก 15 วัน
-วันที่ 2 และวันที่ 17 ของทุกเดือน
+${CYCLE}
 รอบละ 1 คน ที่ดวงกำเนิดรับดาวจรแรงสุด
 
 ไม่ใช่การจับรางวัล — คัดจากดวงคุณเอง
@@ -40,8 +47,7 @@ const TEXT_OA2 =
 คุณอาจมีสิทธิ์คุยกับอาจารย์ปรินนี่
 ตัวต่อตัว 1 ชั่วโมง ไม่มีค่าใช้จ่ายเพิ่ม
 
-ระบบคำนวณใหม่ทุก 15 วัน
-วันที่ 2 และวันที่ 17 ของทุกเดือน
+${CYCLE}
 รอบละ 1 คน ที่ดวงกำเนิดรับดาวจรแรงสุด
 
 ไม่ใช่การจับรางวัล — คัดจากวัน เวลา สถานที่เกิดจริง
@@ -112,7 +118,18 @@ function ask(q) {
   if (!['oa1', 'oa2', 'both'].includes(SEND)) { console.error('--send ต้องเป็น oa1 · oa2 · both'); process.exit(1); }
   show();
   const targets = SEND === 'both' ? ['oa1', 'oa2'] : [SEND];
-  const names = { oa1: '@prinnie333 (บัญชีบริการ ~10,000 คน)', oa2: '@efb2738a (บัญชีใหญ่)' };
+  // เลขผู้ติดตามต้องถามจาก LINE ตอนนั้น ไม่ใช่ฮาร์ดโค้ด
+  // ของเดิมเขียนไว้ "~10,000 คน" แต่ของจริง 2,132 — ตัวเลขผิดทำให้ตัดสินใจผิดว่าจะยิงหาใคร
+  const reach = await (async () => {
+    try {
+      const d = new Date(Date.now() - 3 * 864e5).toISOString().slice(0, 10).replace(/-/g, '');
+      const r = await fetch('https://api.line.me/v2/bot/insight/followers?date=' + d,
+        { headers: { Authorization: 'Bearer ' + process.env.LINE_CHANNEL_ACCESS_TOKEN } });
+      const j = await r.json();
+      return j.followers !== undefined ? `${j.followers} คน · ส่งถึงได้ ${j.targetedReaches}` : 'ไม่ทราบจำนวน';
+    } catch { return 'ไม่ทราบจำนวน'; }
+  })();
+  const names = { oa1: `@prinnie333 (บัญชีบริการ · ${reach})`, oa2: '@efb2738a (บัญชีใหญ่)' };
   console.log('⚠️  กำลังจะบรอดแคสต์จริงไปที่: ' + targets.map(t => names[t]).join(' และ '));
   console.log('   ส่งแล้วเรียกคืนไม่ได้ และ LINE นับเป็น 1 ข้อความต่อคน (กินโควต้า)\n');
   const ok = await ask('   พิมพ์ "ส่งเลย" เพื่อยืนยัน · อย่างอื่นคือยกเลิก: ');
