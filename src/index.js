@@ -9,6 +9,7 @@ const bodyParser = require('body-parser');
 const lineRoutes    = require('./routes/line');
 const paymentRoutes = require('./routes/payment');
 const webhook       = require('./routes/webhook');
+const webhookOA2    = require('./routes/webhookOA2');
 const dashboard     = require('./routes/dashboard');
 const goRedirect    = require('./routes/go');
 const scheduler     = require('./scheduler/dailyHoroscope');
@@ -36,6 +37,7 @@ app.set('trust proxy', 1);   // อยู่หลัง Railway proxy → ใ�
 // ⚠️ webhook ต้อง register ก่อน bodyParser.json() — ใช้ raw body ตรวจลายเซ็น
 // (register ก่อน rate-limit ด้วย → LINE ส่ง burst ได้ ไม่โดนจำกัด)
 webhook.register(app);      // LINE
+webhookOA2.mount(app);      // @efb2738a — พาคนที่ส่งสลิปผิดบัญชีไปที่ @prinnie333
 
 app.use(bodyParser.json());
 app.use(express.static('liff'));
