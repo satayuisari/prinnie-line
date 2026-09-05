@@ -19,6 +19,40 @@ const lm = require('../src/services/lineMessaging');
 const BASE = (process.env.PUBLIC_BASE_URL || 'https://prinnie-app-production.up.railway.app').replace(/\/$/, '');
 const IMG = `${BASE}/duang-luek-khun.jpg`;      // ต้องมีไฟล์นี้ใน liff/ (เสิร์ฟเป็น static)
 
+// ── เส้นตายต้องคำนวณสด ห้ามฮาร์ดโค้ด ──────────────────────────────
+//
+// ข้อความเคยเขียนว่า "สมัครภายในพรุ่งนี้จึงจะทันรอบนี้" ซึ่งถูกตอนเขียน
+// (2 ก.ย. → เส้นตาย 3 ก.ย. สำหรับรอบ 17 ก.ย.) แต่พอไม่ได้ยิงวันนั้น
+// ประโยคก็กลายเป็นคำโกหกทันที คนสมัครวันนี้ไม่มีทางทันรอบ 17 ก.ย.
+// เพราะ monthlyPick บังคับเป็นสมาชิกต่อเนื่องครบ 14 วันก่อนวันคัด
+//
+// คิดสดทุกครั้งที่รัน: หารอบแรกที่คนสมัคร "วันนี้" ยังทันจริง ๆ
+const MIN_DAYS = Number(process.env.PICK_MIN_DAYS) || 14;
+const TH_MONTH = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน',
+                  'กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+
+function nextRound(now = new Date()) {
+  const eligible = new Date(now);
+  eligible.setDate(eligible.getDate() + MIN_DAYS);   // วันแรกที่ดวงเข้าเกณฑ์
+  const d = new Date(now.getFullYear(), now.getMonth(), 1);
+  for (let i = 0; i < 8; i++) {
+    for (const day of [2, 17]) {
+      const round = new Date(d.getFullYear(), d.getMonth() + i, day);
+      if (round >= eligible) {
+        const cut = new Date(round);
+        cut.setDate(cut.getDate() - MIN_DAYS);
+        return {
+          round: `${round.getDate()} ${TH_MONTH[round.getMonth()]}`,
+          cutoff: `${cut.getDate()} ${TH_MONTH[cut.getMonth()]}`,
+        };
+      }
+    }
+  }
+  throw new Error('หารอบถัดไปไม่เจอ');
+}
+
+const R = nextRound();
+
 // ── บัญชีบริการ @prinnie333 — คนที่นี่รู้จักเราแล้ว พูดเรื่องสิทธิ์ได้เลย ──
 
 const TEXT_OA1 =
@@ -45,8 +79,8 @@ const TEXT_OA1 =
 คำนวณจากวัน เวลา และสถานที่เกิดของคุณจริง
 ไม่ใช่ดวงราศีที่ใครก็อ่านเหมือนกัน
 
-📅 รอบแรก 17 กันยายน
-ต้องเป็นสมาชิกภายในพรุ่งนี้จึงจะทันรอบนี้
+📅 รอบถัดไป ${R.round}
+ต้องเป็นสมาชิกภายใน ${R.cutoff} จึงจะทันรอบนี้
 
 399 บาท / 30 วัน
 ดวงที่น่าจับตาในรอบต่อไป…อาจเป็นดวงของคุณ
@@ -74,8 +108,8 @@ const TEXT_OA2 =
 ไม่ใช่ดวงราศีที่ทั้งราศีอ่านเหมือนกัน
 ครบ 14 วัน ดวงเข้าสู่การพิจารณาเอง
 
-📅 รอบแรก 17 กันยายน
-เป็นสมาชิกภายในพรุ่งนี้จึงจะทันรอบนี้
+📅 รอบถัดไป ${R.round}
+เป็นสมาชิกภายใน ${R.cutoff} จึงจะทันรอบนี้
 
 399 บาท / 30 วัน
 
