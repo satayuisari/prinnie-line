@@ -128,7 +128,8 @@ describe('การบันทึกผล', () => {
     for (let i = 0; i < 3; i++) {
       assert.equal(await pick.pickForCycle(AT), null, 'รันซ้ำต้องไม่ได้ผู้ได้รับเพิ่ม');
     }
-    const n = await db.query("SELECT COUNT(*)::int n FROM loyalty_rewards WHERE cycle='2026-09'");
+    // รอบเป็นครึ่งเดือนแล้ว: AT = 15 ก.ย. → อยู่ครึ่งแรก จึงเป็น 2026-09-A
+    const n = await db.query("SELECT COUNT(*)::int n FROM loyalty_rewards WHERE cycle='2026-09-A'");
     assert.equal(n.rows[0].n, 1);
   });
 
@@ -136,7 +137,7 @@ describe('การบันทึกผล', () => {
     await member('U_r', '1991-09-09');
     const w = await pick.pickForCycle(AT);
     const row = (await db.query('SELECT cycle, score, detail, note FROM loyalty_rewards WHERE id=$1', [w.id])).rows[0];
-    assert.equal(row.cycle, '2026-09');
+    assert.equal(row.cycle, '2026-09-A');
     assert.ok(Number(row.score) > 0);
     assert.ok(row.detail.length > 3);
     assert.match(row.note, /อันดับ 1 จาก \d+ คน/);
