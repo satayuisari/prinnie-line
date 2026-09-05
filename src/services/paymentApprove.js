@@ -21,7 +21,7 @@ async function approve(order, chargeRef) {
   // ค่าคอมอินฟลู: เฉพาะ subscription + จ่ายจริงครั้งแรก (renew ไม่ได้เพิ่ม) — ไม่ให้พังการเปิดสมาชิก
   await commission.recordFirstPaid(order.line_user_id, order.ref).catch(e => console.error('[approve] commission:', e.message));
   // หมายเหตุ: สิทธิ์ดูดวงกับอาจารย์ไม่ผูกกับการจ่ายเงินอีกแล้ว
-  // เปลี่ยนเป็น "ดวงเลือกคุณ" — คัดจากดาวจรทุกวันที่ 15 (ดู scheduler/loyaltyRewards.js)
+  // เปลี่ยนเป็น "ดวงเลือกคุณ" — คัดจากดาวจรทุกวันที่ 2 และ 17 (ดู scheduler/loyaltyRewards.js)
   const expTH = new Date(r.expire_date).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
   await lineMessaging.pushText(order.line_user_id,
     `ชำระเงินสำเร็จ! ✨\n\nสมาชิก Prinnie333 ของคุณใช้ได้ถึง ${expTH}\nรับดวงประจำวันทุกเช้า 08:00 น. 🌟`).catch(() => {});

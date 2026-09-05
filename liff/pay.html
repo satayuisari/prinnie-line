@@ -33,6 +33,23 @@
               color:#E8C77A;font-weight:800;font-size:0.8rem;
               display:flex;align-items:center;justify-content:center;margin-top:1px}
   .note{font-size:0.8rem;color:rgba(255,255,255,0.5);text-align:center;margin-top:18px;line-height:1.7}
+  /* ทางเลือก "โอนเอง" — สำหรับคนที่แอปธนาคารสแกน QR ไม่ผ่าน (K PLUS เด้งไปเมนู K Point) */
+  .alt{margin-top:20px;border:1px solid rgba(232,199,122,0.28);border-radius:16px;overflow:hidden}
+  .alt summary{list-style:none;cursor:pointer;padding:14px 16px;font-size:0.92rem;font-weight:700;
+               color:#E8C77A;background:rgba(232,199,122,0.08);display:flex;gap:8px;align-items:center}
+  .alt summary::-webkit-details-marker{display:none}
+  .alt summary::after{content:'▾';margin-left:auto;font-size:0.8rem;opacity:.7}
+  .alt[open] summary::after{content:'▴'}
+  .alt .body{padding:14px 16px 16px}
+  .alt .why{font-size:0.82rem;color:rgba(255,255,255,0.6);line-height:1.65;margin-bottom:14px}
+  .field{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,0.06);
+         border-radius:12px;padding:11px 12px;margin-bottom:9px}
+  .field .k{font-size:0.72rem;color:rgba(255,255,255,0.5);flex:0 0 62px}
+  .field .v{font-size:1.02rem;font-weight:700;letter-spacing:0.4px;flex:1;word-break:break-all}
+  .copy{flex:0 0 auto;background:rgba(232,199,122,0.16);color:#E8C77A;border:0;border-radius:9px;
+        padding:8px 12px;font-size:0.8rem;font-weight:700;cursor:pointer;font-family:inherit}
+  .copy:active{opacity:.7}
+  .copy.done{background:rgba(120,220,150,0.2);color:#8FE6AC}
   .err{background:rgba(220,80,80,0.15);border:1px solid rgba(220,80,80,0.4);color:#ffb4b4;
        border-radius:12px;padding:14px;text-align:center;font-size:0.9rem;display:none}
   .ref{font-family:monospace;font-size:0.72rem;color:rgba(255,255,255,0.35);text-align:center;margin-top:14px}
@@ -65,6 +82,32 @@
         <li><span class="num">2</span><span>โอนเงิน (ยอดขึ้นให้อัตโนมัติ) แล้ว<b>เก็บภาพสลิป</b></span></li>
         <li><span class="num">3</span><span><b>ส่งรูปสลิปเข้าแชท</b> Prinnie333 — ระบบเปิดให้อัตโนมัติ</span></li>
       </ol>
+
+      <!-- ⚠️ ลูกค้าหลายรายทักเข้ามาว่า "จ่ายไม่ได้" — สาเหตุที่ลูกค้าบอกเองคือ K PLUS
+           อ่าน QR แล้วเด้งไปเมนู K Point เดิมหน้านี้มีทางเดียวคือสแกน QR คนกลุ่มนี้จึงจ่ายไม่ได้เลย -->
+      <details class="alt" id="alt">
+        <summary>💳 สแกน QR ไม่ได้? โอนเองก็ได้ค่ะ</summary>
+        <div class="body">
+          <div class="why">
+            บางแอป (เช่น K PLUS) สแกน QR แล้วเด้งไปหน้าจ่ายด้วยแต้ม<br>
+            ให้เลือก <b>“โอนเงิน / พร้อมเพย์”</b> ในแอปธนาคาร แล้วกรอกตามนี้แทนได้เลยค่ะ
+          </div>
+          <div class="field" id="f-target">
+            <span class="k">พร้อมเพย์</span><span class="v" id="pp-target">—</span>
+            <button class="copy" data-src="pp-target">คัดลอก</button>
+          </div>
+          <div class="field" id="f-name" style="display:none">
+            <span class="k">ชื่อบัญชี</span><span class="v" id="pp-name">—</span>
+          </div>
+          <div class="field">
+            <span class="k">ยอดโอน</span><span class="v" id="pp-amt">—</span>
+            <button class="copy" data-src="pp-amt">คัดลอก</button>
+          </div>
+          <div class="why" style="margin:12px 0 0">
+            โอนแล้ว<b>ส่งรูปสลิปเข้าแชท</b>ได้เหมือนกันค่ะ ระบบเปิดให้อัตโนมัติ ✨
+          </div>
+        </div>
+      </details>
 
       <div class="note">
         มีสองเครื่อง? สแกน QR ด้านบนจากอีกเครื่องได้เลย<br>
@@ -103,10 +146,47 @@
           setTimeout(()=>URL.revokeObjectURL(url), 4000);
         }catch(_){ window.open(qrUrl, '_blank'); }
       });
+      // ช่องทางโอนเอง — ซ่อนทั้งบล็อกถ้าเซิร์ฟเวอร์ไม่มีเลขพร้อมเพย์ให้ (จะได้ไม่โชว์ช่องว่าง)
+      const pp = d.promptpay || {};
+      if (pp.target) {
+        document.getElementById('pp-target').textContent = pp.target;
+        document.getElementById('pp-amt').textContent = (d.price_thb || 399).toLocaleString() + ' บาท';
+        if (pp.name) {
+          document.getElementById('pp-name').textContent = pp.name;
+          document.getElementById('f-name').style.display = 'flex';
+        }
+      } else {
+        document.getElementById('alt').style.display = 'none';
+      }
+
       document.getElementById('ref').textContent = 'รหัสอ้างอิง: ' + ref;
       document.getElementById('content').style.display = 'block';
     }catch(err){ showErr(err.message); }
   })();
+
+  // ปุ่มคัดลอก — คัดลอกเฉพาะตัวเลข (ตัดขีดคั่นและคำว่า "บาท") ให้วางในแอปธนาคารได้ทันที
+  // เบราว์เซอร์ในแอป LINE บางรุ่นไม่มี clipboard API → ถอยไปใช้ execCommand
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.copy');
+    if(!btn) return;
+    const text = (document.getElementById(btn.dataset.src).textContent || '').replace(/[^\d.]/g, '');
+    const done = () => {
+      const label = btn.textContent;
+      btn.textContent = 'คัดลอกแล้ว'; btn.classList.add('done');
+      setTimeout(() => { btn.textContent = label; btn.classList.remove('done'); }, 1600);
+    };
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+    } else { fallbackCopy(text, done); }
+  });
+  function fallbackCopy(text, done){
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.setAttribute('readonly','');
+    ta.style.cssText = 'position:absolute;left:-9999px';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); done(); } catch(_) {}
+    ta.remove();
+  }
 </script>
 </body>
 </html>

@@ -24,15 +24,18 @@ async function getStats() {
       COUNT(*)::int AS total,
       COUNT(*) FILTER (WHERE chart_data IS NOT NULL)::int AS registered,
       COUNT(*) FILTER (WHERE chart_data IS NOT NULL AND status='PENDING')::int AS pending_reg,
-      COUNT(*) FILTER (WHERE status='ACTIVE')::int    AS active,
-      COUNT(*) FILTER (WHERE status='ACTIVE' AND payment_ref IS NOT NULL
+      -- นับจาก subscribe_end เสมอ ไม่ใช่ status: status ค้างเป็น ACTIVE ได้หลังหมดอายุ
+      -- (เคยทำให้ตัวเลขสมาชิกบนหน้านี้เกินจริงเท่าตัว — 54 ทั้งที่ใช้งานได้จริง 23)
+      COUNT(*) FILTER (WHERE subscribe_end > NOW())::int AS active,
+      COUNT(*) FILTER (WHERE subscribe_end > NOW() AND payment_ref IS NOT NULL
                         AND payment_ref NOT IN ('tester','free-trial','free','founder','LIFETIME_COMP'))::int AS paying,
       COUNT(*) FILTER (WHERE status='PENDING')::int   AS pending,
-      COUNT(*) FILTER (WHERE status='EXPIRED')::int   AS expired,
+      COUNT(*) FILTER (WHERE subscribe_end IS NOT NULL AND subscribe_end <= NOW()
+                        AND status <> 'CANCELLED')::int AS expired,   -- กันนับซ้ำกับ cancelled
       COUNT(*) FILTER (WHERE status='CANCELLED')::int AS cancelled,
       COUNT(*) FILTER (WHERE created_at::date = CURRENT_DATE)::int                  AS today,
       COUNT(*) FILTER (WHERE created_at >= date_trunc('week', CURRENT_DATE))::int   AS this_week,
-      COUNT(*) FILTER (WHERE status='ACTIVE' AND subscribe_end IS NOT NULL
+      COUNT(*) FILTER (WHERE subscribe_end > NOW()
                         AND subscribe_end <= CURRENT_DATE + INTERVAL '7 days')::int AS expiring_soon
     FROM line_subscribers`)).rows[0];
   const recent = (await db.query(`

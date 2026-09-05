@@ -1,14 +1,12 @@
 const express     = require('express');
 const router      = express.Router();
-const beamService = require('../services/beamService');
 const promptpay   = require('../services/promptpayService');
 const orders      = require('../services/paymentOrders');
 const { requireAuth } = require('../services/lineAuth');
 
 // ── ช่องทางชำระเงิน ──
-// PromptPay โอนตรง + แนบสลิป (ปัจจุบัน): Stripe + Beam ปฏิเสธธุรกิจดูดวง → ไม่ต้องผ่านอนุมัติ gateway
-// Beam (สำรอง/ปิดอยู่): โค้ดยังอยู่ครบ ถ้าวันหน้าได้รับอนุมัติค่อยเปิด
-// ถ้ายังไม่ตั้งช่องทางไหนเลย → 410 "กำลังปรับปรุง" (กันสร้างลิงก์เสีย)
+// PromptPay โอนตรง + แนบสลิป ช่องทางเดียว: Stripe + Beam ปฏิเสธธุรกิจดูดวง → ไม่ต้องผ่านอนุมัติ gateway
+// ถ้ายังไม่ตั้ง PROMPTPAY_QR_PAYLOAD/PROMPTPAY_ID → 410 "กำลังปรับปรุง" (กันสร้างลิงก์เสีย)
 const PAYMENT_DISABLED = {
   disabled: true,
   error: 'ช่องทางชำระเงินกำลังปรับปรุง โปรดติดต่อทีมงานสักครู่นะคะ ✨',
@@ -24,11 +22,11 @@ function publicBase() {
 router.post('/create-promptpay', requireAuth, async (req, res) => {
   if (!promptpay.isEnabled()) return res.status(410).json(PAYMENT_DISABLED);
   try {
-    const ref = await orders.create({
+    // ใช้ใบเดิมที่ยังไม่ส่งสลิปต่อ (กดปุ่มซ้ำไม่ควรได้ออเดอร์ใบใหม่ทุกครั้ง)
+    const ref = await orders.createOrReuse({
       type: 'subscription',
       line_user_id: req.line.userId,
-      amount: promptpay.PRICE_THB * 100,   // เก็บเป็นสตางค์ ให้สอดคล้องกับ Beam
-      method: 'promptpay',
+      amount: promptpay.PRICE_THB * 100,   // เก็บเป็นสตางค์
     });
     res.json({ url: `${publicBase()}/pay.html?ref=${ref}` });
   } catch (err) {
@@ -38,10 +36,14 @@ router.post('/create-promptpay', requireAuth, async (req, res) => {
 });
 
 // ข้อมูลออเดอร์สำหรับหน้า pay.html (ref = โทเคนสุ่ม ทำหน้าที่เป็น capability — ไม่คืนข้อมูลส่วนตัว)
+// promptpay = ข้อมูลผู้รับเงินแบบพิมพ์เองได้ (เท่ากับที่ฝังใน QR อยู่แล้ว) — ไว้ให้คนที่สแกนไม่ผ่าน
 router.get('/order/:ref', async (req, res) => {
   const o = await orders.get(req.params.ref);
   if (!o) return res.status(404).json({ error: 'not_found' });
-  res.json({ ref: o.ref, amount: o.amount, price_thb: o.amount / 100, status: o.status, type: o.type });
+  res.json({
+    ref: o.ref, amount: o.amount, price_thb: o.amount / 100, status: o.status, type: o.type,
+    promptpay: promptpay.recipient(),
+  });
 });
 
 // QR PromptPay ของออเดอร์ (จำนวนเงินฝังในคิวอาร์ → ลูกค้าสแกนแล้วยอดขึ้นเอง)
@@ -58,24 +60,5 @@ router.get('/promptpay-qr/:ref', async (req, res) => {
   }
 });
 
-// ── Beam (สำรอง) — เปิดเมื่อ beamService.isEnabled() เท่านั้น ──
-router.post('/create-checkout', requireAuth, async (req, res) => {
-  if (!beamService.isEnabled()) return res.status(410).json(PAYMENT_DISABLED);
-  try {
-    const ref = await orders.create({
-      type: 'subscription',
-      line_user_id: req.line.userId,
-      amount: beamService.PRICE_THB * 100,
-      method: 'beam',
-    });
-    const { url } = await beamService.createSubscriptionLink(ref);
-    res.json({ url });
-  } catch (err) {
-    console.error('[payment] create-checkout:', err.message);
-    res.status(500).json({ error: 'สร้างหน้าจ่ายเงินไม่สำเร็จ ลองใหม่อีกครั้งนะคะ' });
-  }
-});
-
-// หมายเหตุ: webhook การชำระเงิน (Beam) อยู่ที่ src/routes/beamWebhook.js (ตรวจลายเซ็น)
-//   PromptPay ไม่มี webhook — ยืนยันด้วยสลิป + staff อนุมัติบน dashboard
+// หมายเหตุ: PromptPay ไม่มี webhook — ยืนยันด้วยสลิป + staff อนุมัติบน dashboard
 module.exports = router;

@@ -21,15 +21,24 @@ const MIN_MEMBER_DAYS = Number(process.env.PICK_MIN_DAYS) || 14;
 const REWARD = 'ดูดวงส่วนตัวกับ อ.ปรินนี่ 1 ชั่วโมง';
 const EXPIRE_DAYS = Number(process.env.LOYALTY_EXPIRE_DAYS) || 60;
 
-const cycleOf = (d) => `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+// รอบ = ครึ่งเดือน ไม่ใช่ทั้งเดือน
+// เดิมคีย์เป็น YYYY-MM ทำให้ cron ที่ยิงวันที่ 2 และ 17 คัดได้แค่ครั้งเดียว
+// เพราะ pickForCycle เจอว่า "รอบนี้มีคนได้แล้ว" ตั้งแต่รอบวันที่ 2 → วันที่ 17 ไม่ทำอะไรเลย
+// A = วันที่ 1-16 (คัดวันที่ 2) · B = วันที่ 17 เป็นต้นไป (คัดวันที่ 17)
+const cycleOf = (d) =>
+  `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${d.getUTCDate() < 17 ? 'A' : 'B'}`;
 
 // สมาชิกที่เข้าเกณฑ์: จ่ายจริง · ยังใช้งานอยู่ · เป็นสมาชิกครบ N วัน · มีดวงกำเนิด
 // · ไม่เคยได้รับสิทธิ์ในรอบ COOLDOWN_MONTHS เดือนล่าสุด
+//
+// ⚠️ "ยังใช้งานอยู่" ต้องเช็ก subscribe_end ด้วย ไม่ใช่ status อย่างเดียว —
+//    เดิมคนที่หมดอายุแล้ว 31 คนเข้าเกณฑ์ชิงสิทธิ์ได้ เพราะ status ค้างเป็น ACTIVE
 async function eligibleMembers(at = new Date()) {
   return (await db.query(`
     SELECT s.line_user_id, s.nickname, s.display_name, s.chart_data
     FROM line_subscribers s
     WHERE s.status='ACTIVE'
+      AND s.subscribe_end > $1::timestamp   -- ต้องยังใช้งานได้จริง ไม่ใช่แค่ status ค้าง
       AND s.chart_data IS NOT NULL
       AND s.payment_ref IS NOT NULL
       AND s.payment_ref NOT IN ('tester','free-trial','free','founder','LIFETIME_COMP')

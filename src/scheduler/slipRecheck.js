@@ -11,7 +11,10 @@ const db = require('../db');
 const orders = require('../services/paymentOrders');
 const slipVerify = require('../services/slipVerify');
 const paymentApprove = require('../services/paymentApprove');
-const { getMessageContent, pushText } = require('../services/lineMessaging');
+const { getMessageContent, pushText, notifyAdmins } = require('../services/lineMessaging');
+
+// เลยหน้าต่างตรวจซ้ำแล้วยังไม่ผ่าน = ต้องมีคนดู
+const RECHECK_WINDOW_MIN = 90;
 
 async function recheck() {
   if (!slipVerify.isEnabled()) return { checked: 0 };
@@ -46,10 +49,43 @@ async function recheck() {
   return { checked: rows.length, approved };
 }
 
+// ── ตาข่ายกันสลิปหาย ──
+// สลิปที่ตรวจอัตโนมัติไม่ผ่านจนเลย 90 นาที จะหลุดจากทั้ง recheck (หมดหน้าต่าง) และ
+// pendingOrders (ข้ามใบที่มีสลิป) → เดิมไม่มีใครรู้เลยว่าค้าง ทั้งที่ลูกค้าโอนเงินมาแล้ว
+// และเพิ่งได้ยินจากบอทว่า "ไม่ต้องส่งซ้ำนะคะ เดี๋ยวระบบตรวจให้"
+// → ส่งให้แอดมินดูด้วยมือ ครั้งเดียวต่อออเดอร์ (escalated_at) + บอกลูกค้าตามตรง
+async function escalateStuck() {
+  const rows = (await db.query(`
+    UPDATE payment_orders SET escalated_at = NOW()
+     WHERE ref IN (
+       SELECT ref FROM payment_orders
+        WHERE status='PENDING' AND method='promptpay'
+          AND slip_message_id IS NOT NULL AND escalated_at IS NULL
+          AND slip_received_at < NOW() - ($1 || ' minutes')::interval
+        ORDER BY slip_received_at LIMIT 20)
+    RETURNING ref, type, amount, line_user_id`, [String(RECHECK_WINDOW_MIN)])).rows;
+  if (!rows.length) return { escalated: 0 };
+
+  for (const o of rows) {
+    const what = o.type === 'couple' ? 'ปลดล็อกดวงคู่' : 'เปิดใช้งานสมาชิก';
+    await notifyAdmins(
+      `⚠️ สลิปค้างเกิน ${RECHECK_WINDOW_MIN} นาที — ระบบตรวจอัตโนมัติไม่ผ่าน ต้องเช็กมือ\n` +
+      `รายการ: ${what} ${o.amount / 100}฿ (${o.ref})\nid: ${o.line_user_id}\n` +
+      `👉 เข้า dashboard กดดูสลิป → อนุมัติ`).catch(() => {});
+    await pushText(o.line_user_id,
+      `ขออภัยที่ให้รอนะคะ 🙏 สลิปของคุณระบบตรวจอัตโนมัติยังไม่ผ่าน\n` +
+      `ทีมงานรับเรื่องไปตรวจด้วยตัวเองแล้ว จะ${what}ให้เร็วที่สุดค่ะ ✨`).catch(() => {});
+    console.log(`[slip-recheck] ⚠️ ส่งต่อให้แอดมิน ${o.ref}`);
+  }
+  return { escalated: rows.length };
+}
+
 function start() {
-  cron.schedule('*/5 * * * *', () => recheck().catch(e => console.error('[slip-recheck]', e.message)),
-    { timezone: 'Asia/Bangkok' });
+  cron.schedule('*/5 * * * *', () => {
+    recheck().catch(e => console.error('[slip-recheck]', e.message));
+    escalateStuck().catch(e => console.error('[slip-recheck] escalate:', e.message));
+  }, { timezone: 'Asia/Bangkok' });
   console.log('[slip-recheck] ตรวจสลิปซ้ำทุก 5 นาที (สำหรับธนาคารที่ข้อมูลมาช้า)');
 }
 
-module.exports = { start, recheck };
+module.exports = { start, recheck, escalateStuck };

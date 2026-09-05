@@ -123,7 +123,7 @@ function buildSvg(W, H) {
         fill="url(#gold)">ดวงเลือกคุณ</text>
 
   <text x="${textX}" y="${subY}" text-anchor="${anchor}" font-size="${subSize}" font-weight="400" fill="#F6F1FF">
-    ทุกวันที่ 15 ดาวทำมุมกับดวงเกิดของใครแรงที่สุด
+    ทุก 15 วัน ดาวทำมุมกับดวงเกิดของใครแรงที่สุด
   </text>
   <text x="${textX}" y="${subY + subSize * 1.35}" text-anchor="${anchor}" font-size="${subSize}" font-weight="400" fill="#F6F1FF">
     คนนั้นได้คุยกับอาจารย์ปรินนี่ 1 ชั่วโมง
