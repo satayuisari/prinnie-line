@@ -14,17 +14,33 @@ const SIGNUP = process.env.SIGNUP_LIFF_URL || 'https://liff.line.me/2010382680-c
 const OA1_URL = 'https://line.me/R/ti/p/@prinnie333';
 
 // ปุ่มให้กด ดีกว่าให้ก๊อปลิงก์เอง — คนแก่/คนไม่ถนัดมือถือกดผิดน้อยลง
+//
+// ⚠️ label ของ LINE จำกัด 20 ตัวอักษร และ text ของ buttons จำกัด 160
+//    ถ้าเกินแม้ตัวเดียว LINE ปฏิเสธ "ทั้งข้อความ" ไม่ใช่ตัดให้สั้นลง
+//    ของเดิม 'ไปที่ไลน์หลัก @prinnie333' = 25 ตัว → คนส่งสลิปมาผิดบัญชี
+//    แล้วไม่ได้รับคำตอบใด ๆ เลย เงียบไปทั้งเส้น ซึ่งแปลว่าเงินหาย
+//    ชื่อบัญชีอยู่ในตัวลิงก์อยู่แล้ว ไม่ต้องเขียนซ้ำบนปุ่ม
+const LABEL_MAX = 20;
+const TEXT_MAX = 160;
+
 const buttons = (text) => ({
   type: 'template',
   altText: text.split('\n')[0],
   template: {
-    type: 'buttons', text: text.slice(0, 160),
+    type: 'buttons', text: text.slice(0, TEXT_MAX),
     actions: [
       { type: 'uri', label: 'สมัครสมาชิก', uri: SIGNUP },
-      { type: 'uri', label: 'ไปที่ไลน์หลัก @prinnie333', uri: OA1_URL },
+      { type: 'uri', label: 'ไปที่ไลน์หลัก', uri: OA1_URL },
     ],
   },
 });
+
+// กันไว้ตั้งแต่ตอนโหลดไฟล์ ดีกว่าไปรู้ตอนลูกค้าไม่ได้รับข้อความ
+for (const a of buttons('x').template.actions) {
+  if ([...a.label].length > LABEL_MAX) {
+    throw new Error(`ปุ่ม "${a.label}" ยาว ${[...a.label].length} ตัว เกิน ${LABEL_MAX} — LINE จะปฏิเสธทั้งข้อความ`);
+  }
+}
 
 // จับความตั้งใจจากคำที่คนพิมพ์จริง เรียงจากเรื่องที่พลาดแล้วเสียหายที่สุดก่อน
 //   จ่ายเงิน > สมัคร/ราคา > อยากดูดวง > ทักทาย
