@@ -20,7 +20,16 @@ function longitudeOf(body, date) {
     return Astronomy.EclipticGeoMoon(date).lon;
   }
   // ดาวเคราะห์อื่น: geocentric apparent ecliptic longitude (of-date)
-  return Astronomy.EclipticLongitude(Astronomy.Body[body], date);
+  //
+  // 🔴 ห้ามใช้ Astronomy.EclipticLongitude() ที่นี่ (แก้ 9 ก.ย. 69)
+  //    ฟังก์ชันนั้นคืนค่า HELIOCENTRIC คือตำแหน่งดาวเมื่อมองจากดวงอาทิตย์
+  //    แต่โหราศาสตร์ต้องใช้ GEOCENTRIC คือมองจากโลก
+  //    ผลคือดาวคลาดไปถึง 14.76° (ศุกร์) และ 13.59° (อังคาร) = ข้ามราศีไปเลย
+  //    อาทิตย์กับจันทร์ไม่โดน เพราะใช้ฟังก์ชันคนละตัวที่เป็น geocentric อยู่แล้ว
+  //    จับได้ตอนเทียบกับ astro.com (Swiss Ephemeris) — เจ้าของดวงทักเองว่าพฤหัสไม่ตรง
+  //    ตัวนี้ตรงกับ astro.com ทั้ง 10 ดวงในระดับ 0.01° (ดู scripts/test-ephemeris.js)
+  const vec = Astronomy.GeoVector(Astronomy.Body[body], date, true);  // true = แก้ aberration
+  return Astronomy.Ecliptic(vec).elon;
 }
 
 // คืนตำแหน่งดาวทุกดวง { Sun: 123.4, Moon: 45.6, ... }
