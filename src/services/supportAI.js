@@ -1,6 +1,7 @@
 // AI ร่างคำตอบ support (copilot — staff ตรวจก่อนส่งเสมอ)
 // ใช้ Anthropic SDK. ต้องตั้ง ANTHROPIC_API_KEY; ไม่ตั้ง → คืน enabled:false (ปุ่ม AI ซ่อน, staff พิมพ์เองได้)
 const db = require('../db');
+const aiUsage = require('./aiUsage');
 
 let client = null;
 function getClient() {
@@ -52,10 +53,12 @@ async function draft(inboxId, message) {
       system: SYSTEM,
       messages: [{ role: 'user', content: `ลูกค้าพิมพ์มาว่า: "${message}"\n\nช่วยร่างคำตอบให้หน่อย` }],
     });
+    void aiUsage.record('support_draft', MODEL, resp);
     const text = (resp.content || []).filter(b => b.type === 'text').map(b => b.text).join('').trim();
     if (text) await db.query(`UPDATE support_inbox SET ai_draft=$2 WHERE id=$1`, [inboxId, text]);
     return { enabled: true, draft: text };
   } catch (e) {
+    void aiUsage.record('support_draft', MODEL, null, false);
     console.error('[supportAI] error:', e.message);
     return { enabled: true, error: e.message };
   }
@@ -82,9 +85,11 @@ async function generate(message, category, ctx) {
       system: SYSTEM + '\n\nบริบทหมวดนี้: ' + (NUANCE[category] || NUANCE.general) + ctxBlock,
       messages: [{ role: 'user', content: `ลูกค้าพิมพ์มาว่า: "${message}"` }],
     });
+    void aiUsage.record('support_reply', MODEL, resp);
     const text = (resp.content || []).filter(b => b.type === 'text').map(b => b.text).join('').trim();
     return text || null;
   } catch (e) {
+    void aiUsage.record('support_reply', MODEL, null, false);
     console.error('[supportAI] generate error:', e.message);
     return null;
   }

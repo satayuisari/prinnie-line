@@ -6,6 +6,7 @@
 //
 // ถ้าไม่มี ANTHROPIC_API_KEY → คืน brief แบบข้อมูลดิบ (อาจารย์ยังทำงานได้ ไม่บล็อกคิว)
 const db = require('../db');
+const aiUsage = require('./aiUsage');
 
 const MODEL = process.env.ASK_BRIEF_MODEL || 'claude-sonnet-5';
 
@@ -83,9 +84,11 @@ async function build(rewardId) {
       system: SYSTEM,
       messages: [{ role: 'user', content: JSON.stringify(payload, null, 1) }],
     });
+    void aiUsage.record('ask_brief', MODEL, msg);
     const text = (msg.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
     return text || plainBrief(r, questions);
   } catch (e) {
+    void aiUsage.record('ask_brief', MODEL, null, false);
     console.error('[askBrief]', e.message);
     return plainBrief(r, questions) + `\n\n(สรุปด้วย AI ไม่สำเร็จ: ${e.message})`;
   }
