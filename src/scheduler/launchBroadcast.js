@@ -29,6 +29,25 @@ async function send(key, fn, label) {
   catch (e) { console.error(`[launch] ❌ ${label}:`, e.message); await unclaim(key); }  // ให้ลองใหม่รอบหน้า
 }
 
+// เปิดตัว "ดวงเลือกคุณ" — ยิงครั้งเดียวตอน LOYALTY_LAUNCH_AT (เช่น 2026-09-16T21:00:00+07:00)
+// ข้อความเดียวกับ scripts/broadcast-loyalty.js (src/services/loyaltyLaunchText.js)
+// เส้นตาย/รอบคิดสด ณ เวลายิง · กันยิงซ้ำด้วย broadcast_flags เหมือนตัวบน
+// bon สั่ง 15 ก.ย. 69 "setup ให้พร้อม" — ตั้ง env แล้วไม่ต้องมานั่งกดตอนสามทุ่ม
+async function fireLoyalty() {
+  const at = process.env.LOYALTY_LAUNCH_AT;
+  if (!at) return;
+  const t = new Date(at).getTime();
+  if (!Number.isFinite(t)) { console.error('[launch] LOYALTY_LAUNCH_AT อ่านไม่ออก:', at); return; }
+  if (Date.now() < t) return;
+  // เกินเวลามาเกิน 1 วัน = ค่าเก่าค้าง ไม่ยิงย้อนหลัง (กันเปิดเซิร์ฟเวอร์ใหม่แล้วยิงซ้ำในเดือนถัดไป)
+  if (Date.now() - t > 24 * 3600e3) return;
+  const txt = require('../services/loyaltyLaunchText');
+  await send('loyalty-launch-oa1-' + at,
+    () => lineMessaging.broadcast(txt.messages(txt.textOA1())), 'ดวงเลือกคุณ OA1 (บริการ)');
+  if (lineMessaging.oa2Enabled()) await send('loyalty-launch-oa2-' + at,
+    () => lineMessaging.broadcastOA2(txt.messages(txt.textOA2())), 'ดวงเลือกคุณ OA2 (ใหญ่)');
+}
+
 async function fire() {
   const at = process.env.LAUNCH_BROADCAST_AT;
   if (!at) return;
@@ -41,9 +60,12 @@ async function fire() {
 }
 
 function start() {
-  cron.schedule('* * * * *', () => fire().catch(e => console.error('[launch]', e.message)),
-    { timezone: 'Asia/Bangkok' });
-  console.log('[launch] one-time broadcast watcher — ยิงตอน LAUNCH_BROADCAST_AT (ถ้าตั้งไว้)');
+  cron.schedule('* * * * *', () => {
+    fire().catch(e => console.error('[launch]', e.message));
+    fireLoyalty().catch(e => console.error('[launch:loyalty]', e.message));
+  }, { timezone: 'Asia/Bangkok' });
+  console.log('[launch] one-time broadcast watcher — ยิงตอน LAUNCH_BROADCAST_AT (ถ้าตั้งไว้)'
+    + (process.env.LOYALTY_LAUNCH_AT ? ` · ดวงเลือกคุณ ตอน ${process.env.LOYALTY_LAUNCH_AT}` : ' · LOYALTY_LAUNCH_AT ยังไม่ตั้ง'));
 }
 
-module.exports = { start, fire };
+module.exports = { start, fire, fireLoyalty };
