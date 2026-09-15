@@ -12,6 +12,8 @@ const cron    = require('node-cron');
 const pick    = require('../services/monthlyPick');
 const loyalty = require('../services/loyaltyReward');
 const lineMsg = require('../services/lineMessaging');
+const announce = require('../services/pickAnnounce');
+const db      = require('../db');
 
 async function runMonthlyPick({ at = new Date(), dryRun = false } = {}) {
   if (process.env.LOYALTY_ENABLED !== 'true') {
@@ -41,14 +43,26 @@ async function runMonthlyPick({ at = new Date(), dryRun = false } = {}) {
     console.error(`[ดวงเลือกคุณ] แจ้งไม่สำเร็จ ${winner.line_user_id}: ${err.message}`);
   }
 
+  // ประกาศให้ทุกคนเห็น (ไม่เปิดชื่อ) — bon สั่ง 15 ก.ย. 69: คนอื่นต้องรู้ว่ารอบนี้มีคนได้จริง
+  // จะได้อยากเป็นสมาชิก · ปิดได้ด้วย LOYALTY_ANNOUNCE=false · TEST_MODE บล็อกให้เองอีกชั้น
+  let announced = null;
+  if (process.env.LOYALTY_ANNOUNCE !== 'false') {
+    announced = await announce.broadcastAnnouncement({ at, detail: winner.detail, total: winner.total });
+    if (announced.oa1 === 'sent' || announced.oa2 === 'sent') {
+      await db.query('UPDATE loyalty_rewards SET announced_at=NOW() WHERE id=$1', [winner.id]).catch(() => {});
+    }
+    console.log(`[ดวงเลือกคุณ] ประกาศสาธารณะ: OA1 ${announced.oa1} · OA2 ${announced.oa2}`);
+  }
+
   await lineMsg.notifyAdmins(
     `🔮 ดวงเลือกคุณ ${winner.cycle}\n` +
     `ผู้ได้รับ: ${winner.name || winner.line_user_id.slice(0, 12)}\n` +
     `เหตุผล: ${winner.detail} (คะแนน ${winner.score})\n` +
-    `คัดจากสมาชิกที่เข้าเกณฑ์ ${winner.total} คน · รอนัดเวลากับอาจารย์`
+    `คัดจากสมาชิกที่เข้าเกณฑ์ ${winner.total} คน · รอนัดเวลากับอาจารย์\n` +
+    (announced ? `ประกาศสาธารณะ: @prinnie333 ${announced.oa1} · บัญชีใหญ่ ${announced.oa2}` : 'ไม่ได้ประกาศสาธารณะ (LOYALTY_ANNOUNCE=false)')
   ).catch(() => {});
 
-  return { picked: winner };
+  return { picked: winner, announced };
 }
 
 function start() {

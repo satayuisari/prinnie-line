@@ -27,29 +27,8 @@ const IMG = `${BASE}/duang-luek-khun.jpg`;      // ต้องมีไฟล�
 // เพราะ monthlyPick บังคับเป็นสมาชิกต่อเนื่องครบ 14 วันก่อนวันคัด
 //
 // คิดสดทุกครั้งที่รัน: หารอบแรกที่คนสมัคร "วันนี้" ยังทันจริง ๆ
-const MIN_DAYS = Number(process.env.PICK_MIN_DAYS) || 14;
-const TH_MONTH = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน',
-                  'กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
-
-function nextRound(now = new Date()) {
-  const eligible = new Date(now);
-  eligible.setDate(eligible.getDate() + MIN_DAYS);   // วันแรกที่ดวงเข้าเกณฑ์
-  const d = new Date(now.getFullYear(), now.getMonth(), 1);
-  for (let i = 0; i < 8; i++) {
-    for (const day of [2, 17]) {
-      const round = new Date(d.getFullYear(), d.getMonth() + i, day);
-      if (round >= eligible) {
-        const cut = new Date(round);
-        cut.setDate(cut.getDate() - MIN_DAYS);
-        return {
-          round: `${round.getDate()} ${TH_MONTH[round.getMonth()]}`,
-          cutoff: `${cut.getDate()} ${TH_MONTH[cut.getMonth()]}`,
-        };
-      }
-    }
-  }
-  throw new Error('หารอบถัดไปไม่เจอ');
-}
+// nextRound ย้ายไปอยู่ src/services/pickAnnounce.js (ใช้ร่วมกับประกาศผลรอบ) — ตรรกะเดิมทุกประการ
+const { nextRound } = require('../src/services/pickAnnounce');
 
 const R = nextRound();
 
