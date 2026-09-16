@@ -21,6 +21,8 @@ const pendingOrders = require('./scheduler/pendingOrders');
 const loyalty       = require('./scheduler/loyaltyRewards');
 const winbackBlast  = require('./scheduler/winbackBlast');
 const slipRecheck   = require('./scheduler/slipRecheck');
+const contentDesk   = require('./scheduler/contentDesk');
+const contentAdmin  = require('./routes/contentAdmin');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -66,6 +68,7 @@ app.use('/api/payment', apiLimiter, paymentRoutes);
 
 app.use('/dashboard', dashLimiter);
 dashboard.register(app);   // /dashboard?key=DASHBOARD_KEY
+contentAdmin.register(app);   // /dashboard/content — โต๊ะคอนเทนต์
 goRedirect.register(app);  // /go?s=yt → นับคลิกแยกช่องทาง → แอดเพื่อน LINE
 app.get('/health', (_, res) => res.json({ ok: true }));
 
@@ -78,6 +81,7 @@ pendingOrders.start();
 loyalty.start();
 winbackBlast.start();
 slipRecheck.start();
+contentDesk.start();
 
 const mode = process.env.TEST_MODE === 'true' ? '🧪 TEST_MODE (push เฉพาะ allowlist)' : '🚀 PRODUCTION';
 app.listen(PORT, () => {

@@ -192,6 +192,7 @@ ${affAdmin.styles}
     <button class="tb" id="t-aff" onclick="tab('aff')">🤝 Affiliates</button>
     <button class="tb" id="t-com" onclick="tab('com')">💵 Commissions ${aff && aff.comTotals.approved_n ? '<span class="pill" style="background:#1faa59">'+aff.comTotals.approved_n+'</span>' : ''}</button>
     <button class="tb" id="t-rec" onclick="tab('rec')">🎯 Recruitment</button>
+    <a class="tb" style="text-decoration:none" href="/dashboard/content?key=${encodeURIComponent(key)}">📝 คอนเทนต์</a>
   </div>
 
   <div class="pane on" id="p-sub">
