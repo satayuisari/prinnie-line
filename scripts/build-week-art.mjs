@@ -89,7 +89,48 @@ function notice({ kicker, title, lines, foot }) {
   </div>`;
 }
 
+// การ์ดกติกา: หัวข้อ + กลุ่มข้อ ๆ ชิดซ้ายในกรอบกลางภาพ
+function rulesCard({ kicker, title, groups, foot }) {
+  return `<div class="stars">${stars(5)}</div><div class="wrap">
+    <div class="brand" style="margin-top:44px">อาจารย์ปรินนี่</div>
+    <div class="kicker" style="margin-top:14px;font-size:27px">${kicker}</div>
+    <div class="title" style="font-size:56px;margin-top:2px">${title}</div>
+    <div class="rule" style="margin:16px 0 0"></div>
+    <div style="text-align:left;width:860px">
+      ${groups.map(([h, items]) => `
+        <div style="font-size:29px;font-weight:700;color:#D4AF6E;margin-top:16px">${h}</div>
+        ${items.map(t => `<div style="font-size:26px;color:#F0EEF8;margin-top:4px;padding-left:22px">• ${t}</div>`).join('')}
+      `).join('')}
+    </div>
+    <div style="font-size:24px;color:#C4BAE2;margin-top:22px">${foot}</div>
+    <div class="lineid" style="bottom:36px">LINE @PRINNIE333</div>
+  </div>`;
+}
+
 const POSTS = [
+  // กติกาจับรางวัลแบบละเอียด (17 ก.ย. 69) — ทุกข้อต้องตรงกับโค้ด monthlyPick / loyaltyRewards
+  ['ศุกร์18-กติกาจับรางวัล/โพสต์ฟีด.png', rulesCard({
+    kicker: 'สำหรับสมาชิก PRINNIE333',
+    title: 'กติกาจับรางวัลดูดวงกับอาจารย์',
+    groups: [
+      ['รางวัล', ['ดูดวงตัวต่อตัวกับอาจารย์ปรินนี่ ฟรี 1 ชั่วโมง · รอบละ 1 ท่าน']],
+      ['ใครมีสิทธิ์ลุ้น (ต้องครบทุกข้อ)', [
+        'เป็นสมาชิก Prinnie333 (399 บาท / 30 วัน)',
+        'สมัครมาแล้วอย่างน้อย 14 วันก่อนวันจับรางวัล',
+        'สมาชิกยังไม่หมดอายุในวันจับรางวัล',
+        'กรอกวัน เวลา และสถานที่เกิดครบ',
+      ]],
+      ['จับเมื่อไร จับยังไง', [
+        'ทุกวันที่ 2 และ 17 ของเดือน เวลา 20:00 น.',
+        'สุ่มจากรายชื่อสมาชิกที่มีสิทธิ์ ทุกคนมีโอกาสเท่ากัน',
+      ]],
+      ['ถ้าคุณได้รางวัล', [
+        'ได้ข้อความส่วนตัว และมีชื่อในประกาศทางไลน์',
+        'ทีมงานทักไปนัดเวลา · ใช้สิทธิ์ภายใน 60 วัน',
+      ]],
+    ],
+    foot: 'ไม่ต้องลงทะเบียนเพิ่ม · ได้แล้วลุ้นใหม่ได้หลัง 12 เดือน',
+  })],
   // 17 ก.ย. 69: วันนี้ต้องเฉลยผู้ได้รับรางวัล → โพสต์นี้แทนเรื่องเวลาเกิด (เลื่อนไปวันอื่น)
   ['พฤหัส17-ประกาศผู้โชคดี/โพสต์ฟีด.png', notice({
     kicker: 'ผลจับรางวัลสมาชิก PRINNIE333 · รอบ 17 ก.ย.',
