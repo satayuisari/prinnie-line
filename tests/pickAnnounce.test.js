@@ -41,7 +41,9 @@ describe('ข้อความประกาศสาธารณะ', () => {
     assert.ok(text.includes('ทีมงานจะติดต่อผู้ได้รับรางวัลเพื่อนัดเวลา'));
   });
   test('บอกว่าใครมีสิทธิ์ลุ้น: สมาชิก 399 บาท ครบ 14 วัน รอบละ 1 ท่าน', () => {
-    assert.ok(text.includes('ใครมีสิทธิ์ลุ้น'));
+    assert.ok(text.includes('อยากมีสิทธิ์ลุ้นรอบ 2 ตุลาคม ทำแบบนี้ค่ะ'));
+    assert.ok(text.includes('กรอกวัน เวลา และสถานที่เกิดให้ครบ'));
+    assert.ok(text.includes('ต่ออายุสมาชิกให้ยังใช้งานได้ในวันจับรางวัล'));
     assert.ok(text.includes('สมาชิก Prinnie333 (399 บาท / 30 วัน)'));
     assert.ok(text.includes('ครบ 14 วัน'));
     assert.ok(text.includes('รอบละ 1 ท่าน'));
@@ -55,11 +57,11 @@ describe('ข้อความประกาศสาธารณะ', () => {
     assert.ok(text.includes('จากสมาชิกที่มีสิทธิ์ทั้งหมด 38 ท่าน'));
     assert.ok(text.includes('รอบ 17 กันยายน'));
     assert.ok(text.includes('จับรางวัลรอบถัดไป 2 ตุลาคม'));
-    assert.ok(text.includes('ต้องเป็นสมาชิกภายใน 18 กันยายน จึงจะมีสิทธิ์รอบนี้'));
+    assert.ok(text.includes('(399 บาท / 30 วัน) ภายใน 18 กันยายน'));
     // จับวันที่ 15 (สมมติ) รอบหน้า 17 ก.ย. คนสมัครวันนี้ไม่ทัน → ต้องบอกรอบที่ทันจริง
     const t15 = ann.announceText({ at: new Date(2026, 8, 15), name: 'ส้ม', total: 38 });
     assert.ok(t15.includes('จับรางวัลรอบถัดไป 17 กันยายน'));
-    assert.ok(t15.includes('มีสิทธิ์รอบ 2 ตุลาคม (สมัครภายใน 18 กันยายน)'));
+    assert.ok(t15.includes('คนที่สมัครวันนี้ จะมีสิทธิ์รอบ 2 ตุลาคม (สมัครภายใน 18 กันยายน)'));
     assert.ok(text.includes(ann.SIGNUP_URL));
   });
   test('บัญชีใหญ่บอกก่อนว่าบริการคืออะไร · บัญชีบริการไม่ต้อง', () => {
