@@ -53,4 +53,12 @@ describe('ตัวยิงตามเวลา (ไม่แตะ DB ถ้�
     process.env.LOYALTY_LAUNCH_AT = 'สามทุ่ม';
     await launch.fireLoyalty();
   });
+  test('ประกาศผลจับรางวัล: ไม่ตั้ง / ยังไม่ถึง / เลย 1 วัน / อ่านไม่ออก = ไม่ยิง', async () => {
+    for (const v of [undefined, new Date(Date.now() + 3600e3).toISOString(),
+                     new Date(Date.now() - 2 * 86400e3).toISOString(), 'สองทุ่ม']) {
+      if (v === undefined) delete process.env.PICK_ANNOUNCE_AT; else process.env.PICK_ANNOUNCE_AT = v;
+      await launch.firePickAnnounce();
+    }
+    delete process.env.PICK_ANNOUNCE_AT;
+  });
 });

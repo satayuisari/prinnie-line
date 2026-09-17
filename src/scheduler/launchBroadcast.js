@@ -48,6 +48,30 @@ async function fireLoyalty() {
     () => lineMessaging.broadcastOA2(txt.messages(txt.textOA2())), 'ดวงเลือกคุณ OA2 (ใหญ่)');
 }
 
+// ประกาศผลจับรางวัลตามเวลา — ยิงครั้งเดียวตอน PICK_ANNOUNCE_AT
+// bon 17 ก.ย. 69: รอบแรกผลออกตอนเช้าก่อนประกาศจริง "ต้องรอประกาศรางวัลคืนนี้"
+// ประกาศผู้ได้รับล่าสุดในตาราง (ชื่อเล่นจากโปรไฟล์) · กันยิงซ้ำด้วย broadcast_flags
+async function firePickAnnounce() {
+  const at = process.env.PICK_ANNOUNCE_AT;
+  if (!at) return;
+  const t = new Date(at).getTime();
+  if (!Number.isFinite(t)) { console.error('[launch] PICK_ANNOUNCE_AT อ่านไม่ออก:', at); return; }
+  if (Date.now() < t || Date.now() - t > 24 * 3600e3) return;
+  const row = (await db.query(
+    `SELECT r.id, r.note, r.granted_at, COALESCE(s.nickname, s.display_name) AS name
+       FROM loyalty_rewards r LEFT JOIN line_subscribers s ON s.line_user_id = r.line_user_id
+      WHERE r.cycle IS NOT NULL ORDER BY r.granted_at DESC LIMIT 1`)).rows[0];
+  if (!row) return;
+  const total = Number((String(row.note || '').match(/(\d+)\s*คน/) || [])[1]) || 0;
+  const announce = require('../services/pickAnnounce');
+  const when = new Date(row.granted_at);
+  await send('pick-announce-oa1-' + at, () => lineMessaging.broadcast([{ type: 'text',
+    text: announce.announceText({ at: when, name: row.name, total }) }]), 'ประกาศผลจับรางวัล OA1');
+  if (lineMessaging.oa2Enabled()) await send('pick-announce-oa2-' + at, () => lineMessaging.broadcastOA2([{ type: 'text',
+    text: announce.announceText({ at: when, name: row.name, total, forOA2: true }) }]), 'ประกาศผลจับรางวัล OA2');
+  await db.query('UPDATE loyalty_rewards SET announced_at=NOW() WHERE id=$1', [row.id]).catch(() => {});
+}
+
 async function fire() {
   const at = process.env.LAUNCH_BROADCAST_AT;
   if (!at) return;
@@ -63,9 +87,11 @@ function start() {
   cron.schedule('* * * * *', () => {
     fire().catch(e => console.error('[launch]', e.message));
     fireLoyalty().catch(e => console.error('[launch:loyalty]', e.message));
+    firePickAnnounce().catch(e => console.error('[launch:pick]', e.message));
   }, { timezone: 'Asia/Bangkok' });
   console.log('[launch] one-time broadcast watcher — ยิงตอน LAUNCH_BROADCAST_AT (ถ้าตั้งไว้)'
-    + (process.env.LOYALTY_LAUNCH_AT ? ` · ดวงเลือกคุณ ตอน ${process.env.LOYALTY_LAUNCH_AT}` : ' · LOYALTY_LAUNCH_AT ยังไม่ตั้ง'));
+    + (process.env.LOYALTY_LAUNCH_AT ? ` · เปิดตัว ${process.env.LOYALTY_LAUNCH_AT}` : '')
+    + (process.env.PICK_ANNOUNCE_AT ? ` · ประกาศผลจับรางวัล ${process.env.PICK_ANNOUNCE_AT}` : ''));
 }
 
-module.exports = { start, fire, fireLoyalty };
+module.exports = { start, fire, fireLoyalty, firePickAnnounce };
