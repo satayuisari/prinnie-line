@@ -38,32 +38,45 @@ describe('ข้อความประกาศสาธารณะ', () => {
       for (const w of ann.BANNED) assert.ok(!t.includes(w), `ห้ามมีคำว่า "${w}"`);
     }
   });
-  test('บอกดาวและมุมเป็นไทย ไม่บอกชื่อใคร', () => {
-    assert.ok(text.includes('ดาวพลูโต'));
-    assert.ok(text.includes('มุมตรีโกณ'));
-    assert.ok(text.includes('ดาวพุธ'));
-    assert.ok(!/SHGH|คุณ [A-Za-z]/.test(text));
+  // bon 17 ก.ย. 69: ฉบับแรกทำให้ "ทุกคนคิดว่าตัวเองได้ดูดวง" — เทสต์ชุดนี้กันไม่ให้กลับไปแบบนั้น
+  test('อ่านแล้วต้องรู้ว่าได้แค่ 1 ท่าน และไม่ได้ข้อความส่วนตัว = ไม่ใช่คุณ', () => {
+    assert.ok(text.includes('มีสมาชิก 1 ท่าน'));
+    assert.ok(text.includes('ถ้าคุณไม่ได้รับข้อความส่วนตัวจากทีมงาน'));
+    assert.ok(text.includes('แปลว่ารอบนี้ยังไม่ใช่คุณ'));
   });
-  test('บอกจำนวนดวงที่เข้าเกณฑ์ · วันรอบนี้ · รอบถัดไป · เส้นตายสมัคร · ลิงก์สมัคร', () => {
-    assert.ok(text.includes('38 ดวง'));
+  test('บอกชัดว่าเป็นสิทธิ์ของสมาชิกเท่านั้น พร้อมราคาและเงื่อนไข 14 วัน', () => {
+    assert.ok(text.includes('สำหรับสมาชิก'));
+    assert.ok(text.includes('มีเฉพาะสมาชิก Prinnie333 เท่านั้น'));
+    assert.ok(text.includes('399 บาท / 30 วัน'));
+    assert.ok(text.includes('ครบ 14 วัน'));
+  });
+  test('ไม่มีหัวข้อที่ชวนเข้าใจผิด และไม่มีศัพท์โหราศาสตร์ในประกาศสาธารณะ', () => {
+    assert.ok(!text.startsWith('🔮 ดวงเลือกคุณ'), 'หัว "ดวงเลือกคุณ" ทำให้คนเข้าใจว่าตัวเองได้');
+    for (const w of ['ตรีโกณ', 'จตุรัส', 'ทำมุม', 'ดาวพลูโต', 'เจ้าของดวง']) {
+      assert.ok(!text.includes(w), `ไม่ควรมี "${w}"`);
+    }
+    assert.ok(!/SHGH|คุณ [A-Za-z]/.test(text), 'ห้ามมีชื่อใคร');
+  });
+  test('บอกจำนวนที่เข้าเกณฑ์ · วันรอบนี้ · รอบถัดไป · เส้นตายสมัคร · ลิงก์สมัคร', () => {
+    assert.ok(text.includes('ทั้งหมด 38 ท่าน'));
     assert.ok(text.includes('รอบ 17 กันยายน'));
     assert.ok(text.includes('รอบถัดไป 2 ตุลาคม'));
-    assert.ok(text.includes('สมัครภายใน 18 กันยายน ดวงของคุณทันรอบนี้'));
+    assert.ok(text.includes('ต้องเป็นสมาชิกภายใน 18 กันยายน จึงจะทันรอบนี้'));
     // คัดวันที่ 15 (สมมติ) รอบหน้า 17 ก.ย. คนสมัครวันนี้ไม่ทัน → ต้องบอกรอบที่ทันจริง
     const t15 = ann.announceText({ at: new Date(2026, 8, 15), detail: 'Pluto Trine Mercury', total: 38 });
     assert.ok(t15.includes('รอบถัดไป 17 กันยายน'));
     assert.ok(t15.includes('ทันรอบ 2 ตุลาคม (สมัครภายใน 18 กันยายน)'));
     assert.ok(text.includes(ann.SIGNUP_URL));
   });
-  test('บัญชีใหญ่มีคำอธิบายว่าสิทธิ์นี้คืออะไร · บัญชีบริการไม่ต้อง', () => {
+  test('บัญชีใหญ่บอกก่อนว่าบริการคืออะไร · บัญชีบริการไม่ต้อง', () => {
     const oa2 = ann.announceText({ at, detail: 'Pluto Trine Mercury', total: 38, forOA2: true });
-    assert.ok(oa2.includes('ทุกวันที่ 2 และ 17'));
-    assert.ok(!text.includes('ทุกวันที่ 2 และ 17'));
+    assert.ok(oa2.includes('Prinnie333 คือบริการดวงส่วนตัว'));
+    assert.ok(!text.includes('Prinnie333 คือบริการดวงส่วนตัว'));
   });
-  test('detail แปลก ๆ ไม่พัง — ใช้คำกลาง', () => {
+  test('ไม่รู้จำนวนผู้เข้าเกณฑ์ ก็ไม่เขียนว่า 0 ท่าน', () => {
     const t = ann.announceText({ at, detail: '', total: 0 });
-    assert.ok(t.includes('ดาวจร') && t.includes('มุมสำคัญ'));
-    assert.ok(!t.includes('0 ดวง'));
+    assert.ok(!t.includes('0 ท่าน'));
+    assert.ok(t.includes('คัดจากสมาชิกที่เข้าเกณฑ์ทั้งหมด'));
   });
   test('ยาวไม่เกินขีดจำกัดข้อความ LINE (5000)', () => {
     assert.ok(text.length < 5000);

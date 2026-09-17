@@ -17,6 +17,16 @@ describe('ข้อความเปิดตัว', () => {
     assert.ok(t.includes('รอบถัดไป 2 ตุลาคม'));
     assert.ok(t.includes('ภายใน 18 กันยายน'));
   });
+  // bon 17 ก.ย. 69: ข้อความเปิดตัวต้องไม่ทำให้ใครเข้าใจว่าตัวเองได้สิทธิ์แล้ว
+  test('บอกชัดว่าเป็นสิทธิ์ของสมาชิก รอบละ 1 ท่าน และคนที่ได้จะได้ข้อความส่วนตัว', () => {
+    for (const t of [txt.textOA1(new Date(2026, 8, 16)), txt.textOA2(new Date(2026, 8, 16))]) {
+      assert.ok(t.includes('สำหรับสมาชิก'));
+      assert.ok(t.includes('รอบละ 1 ท่าน'));
+      assert.ok(t.includes('ต้องเป็นสมาชิก Prinnie333'));
+      assert.ok(t.includes('ถ้าไม่ได้รับข้อความส่วนตัว'));
+      assert.ok(!t.includes('จังหวะสำคัญ') && !t.includes('เจ้าของดวง'), 'ห้ามกลับไปใช้ถ้อยคำที่ชวนเข้าใจผิด');
+    }
+  });
   test('รูป + ข้อความ = 2 ข้อความ · --no-image = 1', () => {
     assert.equal(txt.messages('x').length, 2);
     assert.equal(txt.messages('x', { image: false }).length, 1);
