@@ -23,6 +23,7 @@ const winbackBlast  = require('./scheduler/winbackBlast');
 const slipRecheck   = require('./scheduler/slipRecheck');
 const contentDesk   = require('./scheduler/contentDesk');
 const contentAdmin  = require('./routes/contentAdmin');
+const salesAdmin    = require('./routes/salesAdmin');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -69,6 +70,7 @@ app.use('/api/payment', apiLimiter, paymentRoutes);
 app.use('/dashboard', dashLimiter);
 dashboard.register(app);   // /dashboard?key=DASHBOARD_KEY
 contentAdmin.register(app);   // /dashboard/content — โต๊ะคอนเทนต์
+salesAdmin.register(app);     // /dashboard/sales — ยอดขาย + วัดผลแคมเปญ
 goRedirect.register(app);  // /go?s=yt → นับคลิกแยกช่องทาง → แอดเพื่อน LINE
 app.get('/health', (_, res) => res.json({ ok: true }));
 
