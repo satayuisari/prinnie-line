@@ -88,7 +88,14 @@ function todayBlock(now = new Date()) {
     const { nextRound } = require('./pickAnnounce');
     const r = nextRound(now);
     const today = now.toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok', day: 'numeric', month: 'long' });
-    return `\n\nข้อมูลวันนี้: วันนี้วันที่ ${today} · สมัครสมาชิกวันนี้จะมีสิทธิ์ลุ้นจับรางวัลรอบ ${r.round} (ต้องเป็นสมาชิกภายใน ${r.cutoff})`;
+    // ประกาศผลที่ตั้งเวลาไว้ (PICK_ANNOUNCE_AT) — ลูกค้าจะถามว่า "ประกาศกี่โมง"
+    let ann = '';
+    const at = new Date(process.env.PICK_ANNOUNCE_AT || '');
+    if (Number.isFinite(at.getTime()) && at > now && at - now < 24 * 3600e3) {
+      const hhmm = at.toLocaleTimeString('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit' });
+      ann = ` · ประกาศชื่อผู้ได้รับรางวัลรอบล่าสุดวันนี้เวลา ${hhmm} น. ในไลน์นี้`;
+    }
+    return `\n\nข้อมูลวันนี้: วันนี้วันที่ ${today} · สมัครสมาชิกวันนี้จะมีสิทธิ์ลุ้นจับรางวัลรอบ ${r.round} (ต้องเป็นสมาชิกภายใน ${r.cutoff})${ann}`;
   } catch {
     return '';
   }
