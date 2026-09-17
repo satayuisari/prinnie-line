@@ -104,6 +104,18 @@ function mount(app) {
     res.sendStatus(200);                       // ตอบ LINE ก่อนเสมอ กัน timeout
     for (const ev of req.body.events || []) {
       if (ev.type !== 'message' || !ev.replyToken) continue;
+      // bon 17 ก.ย. 69: "เพจ 10000 คน อย่าไปยุ่ง เราแค่จะบรอดแคสต์เฉย ๆ"
+      // → ปิดตอบกลับอัตโนมัติ (เปิดคืนด้วย OA2_AUTOREPLY=true) · รูปที่ส่งมา (อาจเป็นสลิป)
+      //   แจ้งแอดมินเงียบ ๆ อย่างเดียว ลูกค้าไม่เห็นอะไร เงินจะได้ไม่หายเงียบ
+      if (process.env.OA2_AUTOREPLY !== 'true') {
+        if (ev.message.type === 'image') {
+          require('../services/lineMessaging')
+            .notifyAdmins('🧾 มีคนส่งรูปมาที่บัญชีใหญ่ (อาจเป็นสลิป) — บอทไม่ได้ตอบ เข้าไปดูในแชทบัญชีใหญ่ค่ะ')
+            .catch(() => {});
+        }
+        console.log(`[webhookOA2] ${ev.message.type} → ไม่ตอบ (บัญชีนี้บรอดแคสต์อย่างเดียว)`);
+        continue;
+      }
       // รูป = แทบทั้งหมดคือสลิป ตอบแบบคนจ่ายเงินไปแล้วเลย ไม่ต้องเดา
       const kind = ev.message.type === 'image' ? 'paid'
         : ev.message.type === 'text' ? pick(ev.message.text || '')

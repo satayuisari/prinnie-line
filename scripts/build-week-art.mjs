@@ -108,7 +108,7 @@ const POSTS = [
     foot: 'รอบแรกพรุ่งนี้ 17 ก.ย. · แจ้งสิทธิ์ทางไลน์ส่วนตัว',
   })],
   ['พฤหัส17-เวลาเกิด/โพสต์ฟีด.png', notice({
-    kicker: 'ความรู้จากอาจารย์ · ไม่มีคำขาย',
+    kicker: 'ความรู้จากอาจารย์ปรินนี่',
     title: 'เวลาเกิด สำคัญกว่าที่คิด',
     lines: [
       ['เกิดวันเดียวกัน ทำไมชีวิตคนละทาง', true],
@@ -116,13 +116,16 @@ const POSTS = [
       ['เช้ากับค่ำวันเดียวกัน ลัคนาคนละราศี', false],
       ['วิธีหาเวลาเกิดของตัวเอง อ่านในแคปชั่นค่ะ', false],
     ],
-    foot: 'ดวงเลือกคุณ คำนวณจากดวงกำเนิด — เวลาเกิดแม่น ยิ่งได้เปรียบ',
+    // 17 ก.ย. 69: เลิกใช้ "ดวงเลือกคุณ" (ทำให้คนเข้าใจผิด) และการจับรางวัลไม่ขึ้นกับดวงแล้ว
+    foot: 'รู้เวลาเกิดแม่น ดวงรายวันของคุณก็ยิ่งตรงตัวค่ะ',
   })],
 ];
 
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1080, height: 1080 } });
-for (const [file, body] of POSTS) {
+// ใส่คำที่สามเพื่อทำเฉพาะโพสต์ที่ชื่อไฟล์มีคำนั้น เช่น node build-week-art.mjs <out> พฤหัส17
+const only = process.argv[3];
+for (const [file, body] of POSTS.filter(([f]) => !only || f.includes(only))) {
   await page.setContent(`<style>${BASE_CSS}</style>${body}`);
   await page.waitForTimeout(400);
   const out = path.join(OUT, file);
