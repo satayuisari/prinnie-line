@@ -10,6 +10,7 @@ const supportInbox = require('../services/supportInbox');
 const supportAI    = require('../services/supportAI');
 const triage       = require('../services/supportTriage');
 const paymentOrders = require('../services/paymentOrders');
+const slipHelp     = require('../services/slipHelp');
 const db           = require('../db');
 
 async function lineClient_safeProfile(userId) {
@@ -248,6 +249,24 @@ async function handleEvent(event) {
         const guide = BIRTH_GUIDE(LIFF_URL);
         if (id) await supportInbox.markAutoReplied(id, guide).catch(() => {});
         return replyMessage(event.replyToken, { type: 'text', text: guide });
+      }
+    }
+
+    // 🧾 ลูกค้าบอกว่า "โอนแล้ว" แต่ยังไม่เปิดใช้งาน → บอกให้ส่งรูปสลิป (หรือบอกว่ากำลังตรวจ)
+    // เดิมบอทเงียบ ลูกค้ารอเก้อ แอดมินก็ไม่เห็นสลิป (bon 17 ก.ย. 69) · ไม่ใช้ AI ไม่สัญญาเรื่องเงิน
+    if (slipHelp.claimsPaid(text)) {
+      const ms = await subscribers.getMemberStatus(event.source.userId).catch(() => null);
+      if (!ms || ms.status !== 'ACTIVE') {
+        const order = (await db.query(
+          `SELECT ref, type, amount, slip_message_id FROM payment_orders
+            WHERE line_user_id=$1 AND status='PENDING' AND created_at > NOW() - INTERVAL '7 days'
+            ORDER BY created_at DESC LIMIT 1`, [event.source.userId]).catch(() => ({ rows: [] }))).rows[0] || null;
+        const reply = slipHelp.claimReply(order);
+        if (pr !== 'high') {
+          notifyAdmins(`🧾 ลูกค้าบอกว่าโอนแล้ว\nชื่อ: ${name || '-'}\n💬 "${text.slice(0, 150)}"`).catch(() => {});
+        }
+        if (id) await supportInbox.markAutoReplied(id, reply).catch(() => {});
+        return replyMessage(event.replyToken, { type: 'text', text: reply });
       }
     }
 
