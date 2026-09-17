@@ -10,6 +10,7 @@ const supportInbox = require('../services/supportInbox');
 const supportAI    = require('../services/supportAI');
 const triage       = require('../services/supportTriage');
 const paymentOrders = require('../services/paymentOrders');
+const db           = require('../db');
 
 async function lineClient_safeProfile(userId) {
   try { const p = await client.getProfile(userId); return p && p.displayName; }
@@ -247,6 +248,22 @@ async function handleEvent(event) {
         const guide = BIRTH_GUIDE(LIFF_URL);
         if (id) await supportInbox.markAutoReplied(id, guide).catch(() => {});
         return replyMessage(event.replyToken, { type: 'text', text: guide });
+      }
+    }
+
+    // 🎁 ผู้ได้สิทธิ์ดูดวงฟรี: ห้ามให้บอทตอบเด็ดขาด (17 ก.ย. 69 บอทบอกผู้ได้สิทธิ์ตัวจริง
+    // ว่า "อาจเป็นข้อความหลอกลวง") — ส่งให้คนทันที · คนอื่นที่ถามเรื่องสิทธิ์ บอทตอบได้
+    // เพราะ SYSTEM รู้จักโปรแกรมแล้ว แต่ต้องแจ้งแอดมินให้ตามดูด้วย
+    if (id) {
+      const reward = await db.query(
+        `SELECT id FROM loyalty_rewards WHERE line_user_id=$1 AND status IN ('GRANTED','NOTIFIED','BOOKED')
+           AND granted_at >= NOW() - INTERVAL '45 days' LIMIT 1`, [event.source.userId]).catch(() => ({ rows: [] }));
+      if (reward.rows.length) {
+        notifyAdmins(`🎁 ผู้ได้สิทธิ์ดูดวงฟรีทักมา — บอทไม่ตอบ รอทีมงาน\nชื่อ: ${name || '-'}\n💬 "${text.slice(0, 150)}"\n👉 ติดต่อกลับเพื่อนัดเวลากับอาจารย์`).catch(() => {});
+        return;
+      }
+      if (/ดูดวงฟรี|1\s*ชั่วโมง|1\s*ชม|เปิดดวง|ตัวต่อตัว|ดวงเลือก|สิทธิ์|สิทธิ|นัดคุย/.test(text)) {
+        notifyAdmins(`❓ มีคนถามเรื่องสิทธิ์ดูดวงฟรี\nชื่อ: ${name || '-'}\n💬 "${text.slice(0, 150)}"`).catch(() => {});
       }
     }
 
