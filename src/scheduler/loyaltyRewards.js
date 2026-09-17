@@ -22,10 +22,11 @@ async function runMonthlyPick({ at = new Date(), dryRun = false } = {}) {
   }
 
   if (dryRun) {
-    const ranked = await pick.rank(at);
-    console.log(`[ดวงเลือกคุณ] dry-run ${pick.cycleOf(at)} — เข้าเกณฑ์ ${ranked.length} คน` +
-      (ranked[0] ? ` · อันดับ 1: ${ranked[0].name || ranked[0].line_user_id.slice(0, 10)} (${ranked[0].detail} · ${ranked[0].score})` : ''));
-    return { picked: null, dryRun: true, ranked: ranked.length, top: ranked[0] || null };
+    const members = await pick.eligibleMembers(at);
+    const w = pick.drawOne(members, pick.seedOf(pick.cycleOf(at)));
+    console.log(`[จับรางวัล] dry-run ${pick.cycleOf(at)} — มีสิทธิ์ ${members.length} คน` +
+      (w ? ` · จะได้: ${w.nickname || w.display_name || w.line_user_id.slice(0, 10)}` : ''));
+    return { picked: null, dryRun: true, ranked: members.length, top: w || null };
   }
 
   const winner = await pick.pickForCycle(at);
@@ -34,10 +35,10 @@ async function runMonthlyPick({ at = new Date(), dryRun = false } = {}) {
     return { picked: null };
   }
 
-  console.log(`[ดวงเลือกคุณ] ${winner.cycle} → ${winner.line_user_id.slice(0, 10)}… · ${winner.detail} · คะแนน ${winner.score} (จาก ${winner.total} คน)`);
+  console.log(`[จับรางวัล] ${winner.cycle} → ${winner.line_user_id.slice(0, 10)}… · seed ${winner.seed} (จาก ${winner.total} คน)`);
 
   try {
-    await lineMsg.pushText(winner.line_user_id, pick.pickMessage(winner.name, winner.detail));
+    await lineMsg.pushText(winner.line_user_id, pick.pickMessage(winner.name));
     await loyalty.markNotified(winner.id);
   } catch (err) {
     console.error(`[ดวงเลือกคุณ] แจ้งไม่สำเร็จ ${winner.line_user_id}: ${err.message}`);
@@ -47,7 +48,7 @@ async function runMonthlyPick({ at = new Date(), dryRun = false } = {}) {
   // จะได้อยากเป็นสมาชิก · ปิดได้ด้วย LOYALTY_ANNOUNCE=false · TEST_MODE บล็อกให้เองอีกชั้น
   let announced = null;
   if (process.env.LOYALTY_ANNOUNCE !== 'false') {
-    announced = await announce.broadcastAnnouncement({ at, detail: winner.detail, total: winner.total });
+    announced = await announce.broadcastAnnouncement({ at, name: winner.name, total: winner.total });
     if (announced.oa1 === 'sent' || announced.oa2 === 'sent') {
       await db.query('UPDATE loyalty_rewards SET announced_at=NOW() WHERE id=$1', [winner.id]).catch(() => {});
     }
@@ -55,10 +56,10 @@ async function runMonthlyPick({ at = new Date(), dryRun = false } = {}) {
   }
 
   await lineMsg.notifyAdmins(
-    `🔮 ดวงเลือกคุณ ${winner.cycle}\n` +
+    `🎉 จับรางวัลสมาชิก ${winner.cycle}\n` +
     `ผู้ได้รับ: ${winner.name || winner.line_user_id.slice(0, 12)}\n` +
-    `เหตุผล: ${winner.detail} (คะแนน ${winner.score})\n` +
-    `คัดจากสมาชิกที่เข้าเกณฑ์ ${winner.total} คน · รอนัดเวลากับอาจารย์\n` +
+    `จากผู้มีสิทธิ์ ${winner.total} คน · seed ${winner.seed}\n` +
+    `👉 ติดต่อนัดเวลากับอาจารย์\n` +
     (announced ? `ประกาศสาธารณะ: @prinnie333 ${announced.oa1} · บัญชีใหญ่ ${announced.oa2}` : 'ไม่ได้ประกาศสาธารณะ (LOYALTY_ANNOUNCE=false)')
   ).catch(() => {});
 

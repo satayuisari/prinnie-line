@@ -80,55 +80,72 @@ async function rank(at = new Date()) {
   return scored;
 }
 
-// เลือกผู้ได้รับของรอบเดือนนี้ + บันทึก (idempotent ด้วย unique index บน cycle)
-// คืน null ถ้ารอบนี้มีคนได้แล้ว หรือไม่มีใครเข้าเกณฑ์
+// ── จับรางวัล ─────────────────────────────────────────────────────────────
+// bon 17 ก.ย. 69: "399 ใครเป็นสมาชิกมีสิทธิ์ลุ้นดูดวงกับอาจารย์ ประกาศชื่อเมื่อถึงเวลา
+//                  ให้นัดดูหลังจากนั้น" · "เอาเป็นจับรางวัลนี่ละลุย"
+//
+// จับแบบตรวจสอบย้อนได้ (วิธีเดียวกับ scripts/lucky-draw.js): รายชื่อผู้มีสิทธิ์เรียงตาม
+// line_user_id แล้วใช้ sha256 ของ seed เลือกลำดับ ใครถือ seed กับรายชื่อชุดเดียวกัน
+// ได้ผลเดิมทุกครั้ง — seed เก็บไว้ในบันทึกของรอบ ถ้ามีคนถามว่าโกงไหม ชี้ย้อนได้
+const crypto = require('crypto');
+
+function seedOf(cycle) {
+  return `prinnie-${cycle}`;
+}
+
+/** เลือกหนึ่งคนจากรายชื่อด้วย seed — ฟังก์ชันบริสุทธิ์ เทสได้ */
+function drawOne(members, seed) {
+  if (!members.length) return null;
+  const list = [...members].sort((x, y) => x.line_user_id.localeCompare(y.line_user_id));
+  const n = crypto.createHash('sha256').update(seed).digest().readUInt32BE(0);
+  return list[n % list.length];
+}
+
+// จับผู้ได้รางวัลของรอบนี้ + บันทึก (idempotent ด้วย unique index บน cycle)
+// คืน null ถ้ารอบนี้จับไปแล้ว หรือไม่มีใครมีสิทธิ์
 async function pickForCycle(at = new Date()) {
   const cycle = cycleOf(at);
   const already = (await db.query('SELECT id FROM loyalty_rewards WHERE cycle=$1', [cycle])).rows[0];
   if (already) return null;
 
-  const ranked = await rank(at);
-  if (!ranked.length) return null;
-  const winner = ranked[0];
+  const members = await eligibleMembers(at);
+  if (!members.length) return null;
+  const seed = seedOf(cycle);
+  const w = drawOne(members, seed);
+  const name = w.nickname || w.display_name || null;
 
   const expires = new Date(at.getTime() + EXPIRE_DAYS * 86400e3).toISOString();
   const r = await db.query(
     `INSERT INTO loyalty_rewards
        (line_user_id, milestone, reward, reward_value, status, cycle, score, detail, expires_at, note)
-     VALUES ($1,$2,$3,0,'GRANTED',$4,$5,$6,$7,$8)
+     VALUES ($1,$2,$3,0,'GRANTED',$4,NULL,'draw',$5,$6)
      ON CONFLICT DO NOTHING
-     RETURNING id, line_user_id, cycle, score, detail`,
-    [winner.line_user_id, at.getUTCFullYear(), REWARD, cycle, winner.score, winner.detail, expires,
-     `อันดับ 1 จาก ${ranked.length} คน`]);
+     RETURNING id, line_user_id, cycle`,
+    [w.line_user_id, at.getUTCFullYear(), REWARD, cycle, expires,
+     `จับรางวัล seed=${seed} จากผู้มีสิทธิ์ ${members.length} คน`]);
   if (!r.rows[0]) return null;                 // ชนกับรอบที่รันพร้อมกัน — ปล่อยผ่าน
-  return { ...r.rows[0], name: winner.name, total: ranked.length };
+  return { ...r.rows[0], name, total: members.length, seed };
 }
 
-// ข้อความแจ้งผู้ได้รับ — อธิบายว่าทำไมถึงเป็นเขา (ไม่ใช่ "คุณโชคดี")
-function pickMessage(name, detail) {
-  const th = {
-    Saturn: 'ดาวเสาร์', Jupiter: 'ดาวพฤหัส', Pluto: 'ดาวพลูโต',
-    Uranus: 'ดาวยูเรนัส', Neptune: 'ดาวเนปจูน',
-  };
-  const planet = th[String(detail || '').split(' ')[0]] || 'ดาวจร';
-  // ชื่อไว้บรรทัดทักทายแยก — เดิมแทรกกลางประโยคแล้วได้ "ของคุณ คุณSHGH" (ซ้ำคำ + ชื่อฝรั่งติดกัน)
-  const hello = name ? `สวัสดีค่ะ คุณ ${String(name).trim()}` : 'สวัสดีค่ะ';
+// ข้อความแจ้งผู้ได้รับรางวัล — ภาษาธรรมดา บอกให้ชัดว่า "คุณได้รางวัล" และต้องทำอะไรต่อ
+// (ฉบับแรก "ดวงคุณเข้าจังหวะสำคัญ … ดาวพลูโตทำมุม" ผู้ได้รับตัวจริงอ่านแล้วไม่รู้ว่าตัวเองได้)
+function pickMessage(name) {
+  const who = name ? `คุณ ${String(name).trim()}` : 'คุณ';
   return [
-    `🔮 เดือนนี้ดวงคุณเข้าจังหวะสำคัญ`,
+    `🎉 ยินดีด้วยค่ะ ${who}`,
     ``,
-    hello,
-    `จากสมาชิก Prinnie333 ทั้งหมด ${planet}ทำมุมกับดวงกำเนิด`,
-    `ของคุณแรงที่สุดในเดือนนี้`,
+    `คุณได้รับรางวัล ดูดวงตัวต่อตัวกับอาจารย์ปรินนี่ฟรี 1 ชั่วโมง`,
+    `จากการจับรางวัลสมาชิก Prinnie333 รอบนี้ค่ะ`,
     ``,
-    `อาจารย์ปรินนี่เลยอยากคุยกับคุณเป็นการส่วนตัว 1 ชั่วโมง`,
-    `ไม่มีค่าใช้จ่ายเพิ่มเติม`,
+    `ขั้นต่อไป: พิมพ์บอกวันและช่วงเวลาที่สะดวกในแชทนี้ได้เลย`,
+    `ทีมงานจะติดต่อกลับเพื่อนัดเวลากับอาจารย์ค่ะ`,
     ``,
-    `ทักมาบอกช่วงเวลาที่สะดวกได้เลยนะคะ`,
-    `(ใช้สิทธิ์ภายใน ${EXPIRE_DAYS} วัน)`,
+    `ใช้สิทธิ์ได้ภายใน ${EXPIRE_DAYS} วัน`,
   ].join('\n');
 }
 
 module.exports = {
+  drawOne, seedOf,
   rank, pickForCycle, eligibleMembers, scoreMember, pickMessage, cycleOf,
   WEIGHT, MIN_WEIGHT, COOLDOWN_MONTHS, MIN_MEMBER_DAYS, REWARD, EXPIRE_DAYS,
 };

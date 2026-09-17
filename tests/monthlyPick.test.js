@@ -133,25 +133,42 @@ describe('การบันทึกผล', () => {
     assert.equal(n.rows[0].n, 1);
   });
 
-  test('บันทึกเหตุผลไว้ตรวจย้อนหลังได้', async () => {
+  // bon 17 ก.ย. 69: เปลี่ยนเป็นจับรางวัล — ต้องตรวจสอบย้อนได้ว่าจับยังไง ใช้ seed อะไร
+  test('บันทึก seed กับจำนวนผู้มีสิทธิ์ไว้ตรวจย้อนหลังได้', async () => {
     await member('U_r', '1991-09-09');
     const w = await pick.pickForCycle(AT);
-    const row = (await db.query('SELECT cycle, score, detail, note FROM loyalty_rewards WHERE id=$1', [w.id])).rows[0];
+    const row = (await db.query('SELECT cycle, detail, note FROM loyalty_rewards WHERE id=$1', [w.id])).rows[0];
     assert.equal(row.cycle, '2026-09-A');
-    assert.ok(Number(row.score) > 0);
-    assert.ok(row.detail.length > 3);
-    assert.match(row.note, /อันดับ 1 จาก \d+ คน/);
+    assert.equal(row.detail, 'draw');
+    assert.match(row.note, /seed=prinnie-2026-09-A จากผู้มีสิทธิ์ 1 คน/);
+  });
+
+  test('seed เดิม + รายชื่อเดิม = ผู้ได้รับคนเดิมเสมอ ไม่ขึ้นกับลำดับที่ส่งเข้า', () => {
+    const people = ['Uc', 'Ua', 'Ue', 'Ub', 'Ud'].map(id => ({ line_user_id: id }));
+    const a = pick.drawOne(people, 'prinnie-2026-10-A');
+    const b = pick.drawOne([...people].reverse(), 'prinnie-2026-10-A');
+    assert.equal(a.line_user_id, b.line_user_id);
+    assert.equal(pick.drawOne([], 'x'), null);
+  });
+
+  test('seed คนละรอบกระจายผู้ได้รับไปหลายคน (ไม่ใช่คนเดิมทุกรอบ)', () => {
+    const people = Array.from({ length: 20 }, (_, i) => ({ line_user_id: 'U' + String(i).padStart(2, '0') }));
+    const winners = new Set();
+    for (let m = 1; m <= 12; m++) for (const h of ['A', 'B'])
+      winners.add(pick.drawOne(people, `prinnie-2027-${String(m).padStart(2, '0')}-${h}`).line_user_id);
+    assert.ok(winners.size >= 8, `24 รอบควรได้ผู้ได้รับหลายคน ได้แค่ ${winners.size}`);
   });
 
   test('ไม่มีใครเข้าเกณฑ์ → ไม่พัง คืน null', async () => {
     assert.equal(await pick.pickForCycle(AT), null);
   });
 
-  test('ข้อความแจ้งผล ไม่ใช้คำว่าโชคดี/สุ่ม และบอกเหตุผล', async () => {
-    const msg = pick.pickMessage('ส้ม', 'Saturn Trine Jupiter');
-    for (const w of ['โชคดี', 'สุ่ม', 'จับรางวัล', 'ลุ้น', 'ผู้ชนะ']) {
-      assert.ok(!msg.includes(w), `ห้ามมีคำว่า "${w}"`);
-    }
-    assert.ok(msg.includes('ดาวเสาร์'), 'ต้องบอกว่าดาวอะไรทำให้ได้รับสิทธิ์');
+  // ผู้ได้รับตัวจริงรอบ 17 ก.ย. อ่านข้อความฉบับเก่าแล้วไม่รู้ว่าตัวเองได้ — ฉบับนี้ต้องชัด
+  test('ข้อความถึงผู้ได้รับ บอกตรง ๆ ว่าได้รางวัลอะไร และต้องทำอะไรต่อ', async () => {
+    const msg = pick.pickMessage('ส้ม');
+    assert.ok(msg.includes('ยินดีด้วยค่ะ คุณ ส้ม'));
+    assert.ok(msg.includes('คุณได้รับรางวัล ดูดวงตัวต่อตัวกับอาจารย์ปรินนี่ฟรี 1 ชั่วโมง'));
+    assert.ok(msg.includes('พิมพ์บอกวันและช่วงเวลาที่สะดวก'));
+    for (const w of ['ทำมุม', 'จังหวะสำคัญ', 'ดาวพลูโต']) assert.ok(!msg.includes(w), `ไม่ควรมี "${w}"`);
   });
 });

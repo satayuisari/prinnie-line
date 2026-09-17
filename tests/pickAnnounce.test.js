@@ -30,59 +30,53 @@ describe('รอบถัดไป (คิดสดจากวันจริ�
 });
 
 describe('ข้อความประกาศสาธารณะ', () => {
+  // bon 17 ก.ย. 69: "399 ใครเป็นสมาชิกมีสิทธิ์ลุ้นดูดวงกับอาจารย์ ประกาศชื่อเมื่อถึงเวลา
+  //                  ให้นัดดูหลังจากนั้น" · ภาษาไทยชัดถ้อยชัดคำ ไม่ให้ใครเข้าใจผิด
   const at = new Date(2026, 8, 17, 9, 0);
-  const text = ann.announceText({ at, detail: 'Pluto Trine Mercury', total: 38 });
+  const text = ann.announceText({ at, name: 'ส้ม', total: 38 });
 
-  test('ไม่มีคำต้องห้ามสักคำ (ทั้งสองบัญชี)', () => {
-    for (const t of [text, ann.announceText({ at, detail: 'Saturn Square Sun', total: 5, forOA2: true })]) {
-      for (const w of ann.BANNED) assert.ok(!t.includes(w), `ห้ามมีคำว่า "${w}"`);
-    }
+  test('ประกาศชื่อผู้ได้รับรางวัลชัด ๆ', () => {
+    assert.ok(text.includes('ผู้ได้รับรางวัลรอบนี้ คือ คุณ ส้ม'));
+    assert.ok(text.includes('ได้ดูดวงตัวต่อตัวกับอาจารย์ปรินนี่ฟรี 1 ชั่วโมง'));
+    assert.ok(text.includes('ทีมงานจะติดต่อผู้ได้รับรางวัลเพื่อนัดเวลา'));
   });
-  // bon 17 ก.ย. 69: ฉบับแรกทำให้ "ทุกคนคิดว่าตัวเองได้ดูดวง" — เทสต์ชุดนี้กันไม่ให้กลับไปแบบนั้น
-  test('อ่านแล้วต้องรู้ว่าได้แค่ 1 ท่าน และไม่ได้ข้อความส่วนตัว = ไม่ใช่คุณ', () => {
-    assert.ok(text.includes('มีสมาชิก 1 ท่าน'));
-    assert.ok(text.includes('ถ้าคุณไม่ได้รับข้อความส่วนตัวจากทีมงาน'));
-    assert.ok(text.includes('แปลว่ารอบนี้ยังไม่ใช่คุณ'));
-  });
-  test('บอกชัดว่าเป็นสิทธิ์ของสมาชิกเท่านั้น พร้อมราคาและเงื่อนไข 14 วัน', () => {
-    assert.ok(text.includes('สำหรับสมาชิก'));
-    assert.ok(text.includes('มีเฉพาะสมาชิก Prinnie333 เท่านั้น'));
-    assert.ok(text.includes('399 บาท / 30 วัน'));
+  test('บอกว่าใครมีสิทธิ์ลุ้น: สมาชิก 399 บาท ครบ 14 วัน รอบละ 1 ท่าน', () => {
+    assert.ok(text.includes('ใครมีสิทธิ์ลุ้น'));
+    assert.ok(text.includes('สมาชิก Prinnie333 (399 บาท / 30 วัน)'));
     assert.ok(text.includes('ครบ 14 วัน'));
+    assert.ok(text.includes('รอบละ 1 ท่าน'));
   });
-  test('ไม่มีหัวข้อที่ชวนเข้าใจผิด และไม่มีศัพท์โหราศาสตร์ในประกาศสาธารณะ', () => {
-    assert.ok(!text.startsWith('🔮 ดวงเลือกคุณ'), 'หัว "ดวงเลือกคุณ" ทำให้คนเข้าใจว่าตัวเองได้');
-    for (const w of ['ตรีโกณ', 'จตุรัส', 'ทำมุม', 'ดาวพลูโต', 'เจ้าของดวง']) {
-      assert.ok(!text.includes(w), `ไม่ควรมี "${w}"`);
+  test('ไม่มีถ้อยคำที่เคยทำให้คนเข้าใจผิด (ทั้งสองบัญชี)', () => {
+    for (const t of [text, ann.announceText({ at, name: 'ส้ม', total: 5, forOA2: true })]) {
+      for (const w of ann.BANNED) assert.ok(!t.includes(w), `ไม่ควรมี "${w}"`);
     }
-    assert.ok(!/SHGH|คุณ [A-Za-z]/.test(text), 'ห้ามมีชื่อใคร');
   });
-  test('บอกจำนวนที่เข้าเกณฑ์ · วันรอบนี้ · รอบถัดไป · เส้นตายสมัคร · ลิงก์สมัคร', () => {
-    assert.ok(text.includes('ทั้งหมด 38 ท่าน'));
+  test('บอกจำนวนผู้มีสิทธิ์ · วันรอบนี้ · รอบถัดไป · เส้นตายสมัคร · ลิงก์สมัคร', () => {
+    assert.ok(text.includes('จากสมาชิกที่มีสิทธิ์ทั้งหมด 38 ท่าน'));
     assert.ok(text.includes('รอบ 17 กันยายน'));
-    assert.ok(text.includes('รอบถัดไป 2 ตุลาคม'));
-    assert.ok(text.includes('ต้องเป็นสมาชิกภายใน 18 กันยายน จึงจะทันรอบนี้'));
-    // คัดวันที่ 15 (สมมติ) รอบหน้า 17 ก.ย. คนสมัครวันนี้ไม่ทัน → ต้องบอกรอบที่ทันจริง
-    const t15 = ann.announceText({ at: new Date(2026, 8, 15), detail: 'Pluto Trine Mercury', total: 38 });
-    assert.ok(t15.includes('รอบถัดไป 17 กันยายน'));
-    assert.ok(t15.includes('ทันรอบ 2 ตุลาคม (สมัครภายใน 18 กันยายน)'));
+    assert.ok(text.includes('จับรางวัลรอบถัดไป 2 ตุลาคม'));
+    assert.ok(text.includes('ต้องเป็นสมาชิกภายใน 18 กันยายน จึงจะมีสิทธิ์รอบนี้'));
+    // จับวันที่ 15 (สมมติ) รอบหน้า 17 ก.ย. คนสมัครวันนี้ไม่ทัน → ต้องบอกรอบที่ทันจริง
+    const t15 = ann.announceText({ at: new Date(2026, 8, 15), name: 'ส้ม', total: 38 });
+    assert.ok(t15.includes('จับรางวัลรอบถัดไป 17 กันยายน'));
+    assert.ok(t15.includes('มีสิทธิ์รอบ 2 ตุลาคม (สมัครภายใน 18 กันยายน)'));
     assert.ok(text.includes(ann.SIGNUP_URL));
   });
   test('บัญชีใหญ่บอกก่อนว่าบริการคืออะไร · บัญชีบริการไม่ต้อง', () => {
-    const oa2 = ann.announceText({ at, detail: 'Pluto Trine Mercury', total: 38, forOA2: true });
+    const oa2 = ann.announceText({ at, name: 'ส้ม', total: 38, forOA2: true });
     assert.ok(oa2.includes('Prinnie333 คือบริการดวงส่วนตัว'));
     assert.ok(!text.includes('Prinnie333 คือบริการดวงส่วนตัว'));
   });
-  test('ไม่รู้จำนวนผู้เข้าเกณฑ์ ก็ไม่เขียนว่า 0 ท่าน', () => {
-    const t = ann.announceText({ at, detail: '', total: 0 });
+  test('ไม่มีชื่อหรือจำนวน ก็ยังอ่านรู้เรื่อง ไม่เขียนว่า 0 ท่าน', () => {
+    const t = ann.announceText({ at, total: 0 });
+    assert.ok(t.includes('ผู้ได้รับรางวัลรอบนี้ คือ สมาชิก 1 ท่าน'));
     assert.ok(!t.includes('0 ท่าน'));
-    assert.ok(t.includes('คัดจากสมาชิกที่เข้าเกณฑ์ทั้งหมด'));
   });
   test('ยาวไม่เกินขีดจำกัดข้อความ LINE (5000)', () => {
     assert.ok(text.length < 5000);
   });
-  test('assertClean จับคำต้องห้ามได้', () => {
-    assert.throws(() => ann.assertClean('รอบนี้ประกาศผลแล้ว'), /ประกาศผล/);
+  test('assertClean จับถ้อยคำที่ทำให้เข้าใจผิดได้', () => {
+    assert.throws(() => ann.assertClean('🔮 ดวงเลือกคุณ รอบนี้'), /ดวงเลือกคุณ/);
   });
 });
 
