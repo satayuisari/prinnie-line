@@ -39,12 +39,14 @@ function dailyChart(daily, campaigns) {
       <rect x="${x + 1}" y="${yn}" width="${bw - 2}" height="${H - pad - yn}" fill="#D4AF37"/>
       <rect x="${x + 1}" y="${yr}" width="${bw - 2}" height="${yn - yr}" fill="#7FD8E8"/></g>`;
   }).join('');
+  let n = 0;
   const marks = campaigns.map(c => {
     const i = idx.get(report.bkkDay(c.at));
     if (i == null) return '';
     const x = pad + i * bw + bw / 2;
+    const right = x > W * 0.6;                       // ใกล้ขอบขวา → วางชื่อไว้ซ้ายเส้น ไม่ให้ตกขอบ
     return `<line x1="${x}" x2="${x}" y1="6" y2="${H - pad}" stroke="#e0457b" stroke-dasharray="4 3"/>
-      <text x="${x + 4}" y="16" fill="#f08bb0" font-size="11">${esc(c.name)}</text>`;
+      <text x="${right ? x - 4 : x + 4}" y="${16 + (n++ % 2) * 14}" fill="#f08bb0" font-size="11" text-anchor="${right ? 'end' : 'start'}">${esc(c.name)}</text>`;
   }).join('');
   const ticks = daily.map((d, i) => (i % 7 === 0 || i === daily.length - 1)
     ? `<text x="${pad + i * bw + bw / 2}" y="${H - 8}" fill="#a99cc8" font-size="10" text-anchor="middle">${thDay(d.day)}</text>` : '').join('');
@@ -126,7 +128,9 @@ function page(r, key) {
   .nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
   .nav a{background:rgba(255,255,255,.06);border:1px solid rgba(212,175,55,.25);color:#c9bce4;padding:8px 14px;border-radius:10px;text-decoration:none;font-size:13px}
   .nav a.on{background:#D4AF37;color:#2A1B3D;font-weight:700}
-  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+  .verdict,.card{overflow-wrap:anywhere;min-width:0}
+  @media (max-width:520px){body{padding:12px}.val{font-size:22px}.grid{grid-template-columns:1fr 1fr}}
   .card{background:rgba(255,255,255,.05);border:1px solid rgba(212,175,55,.25);border-radius:14px;padding:14px}
   .card.gold{border-color:#D4AF37;background:rgba(212,175,55,.12)}
   .lbl{font-size:12px;color:#c9bce4;margin-bottom:6px}.val{font-size:26px;font-weight:700}

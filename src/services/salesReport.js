@@ -67,11 +67,27 @@ function dailyRevenue(payments, from, to) {
   return map;
 }
 
-// วัดผลแคมเปญหนึ่งรอบ
-// ฐาน = ค่ามัธยฐานรายได้ต่อวัน 14 วันก่อนยิง (มัธยฐานไม่โดนวันพีคของแคมเปญก่อนหน้าดึงขึ้น)
-function campaignStats(c, tagged, orders, now) {
+// ฐาน "ถ้าไม่ยิง" = ค่าเฉลี่ยรายได้ต่อวัน 14 วันก่อนยิง โดยตัดวันที่อยู่ใน 7 วันหลังแคมเปญอื่นออก
+// (มัธยฐานใช้ไม่ได้: วันปกติส่วนใหญ่ขายได้ 0 → ฐานกลายเป็น 0 ทั้งที่ขายได้จริงบ้าง)
+// เหลือวันปกติไม่ถึง 7 วัน → ย้อนไปดู 28 วัน
+function baseline(c, tagged, others) {
   const dayStart = Date.parse(bkkDay(c.at) + 'T00:00:00Z') - BKK;
-  const base = median([...dailyRevenue(tagged, dayStart - 14 * DAY, dayStart).values()]);
+  const hot = (day) => others.some(o => o.at !== c.at && day + DAY > o.at && day < o.at + 7 * DAY);
+  for (const span of [14, 28]) {
+    const days = [];
+    for (let t = dayStart - span * DAY; t < dayStart; t += DAY) if (!hot(t)) days.push(t);
+    if (days.length >= 7 || span === 28) {
+      if (!days.length) return 0;
+      const rev = dailyRevenue(tagged, dayStart - span * DAY, dayStart);
+      return days.reduce((sum, t) => sum + rev.get(bkkDay(t)), 0) / days.length;
+    }
+  }
+  return 0;
+}
+
+// วัดผลแคมเปญหนึ่งรอบ
+function campaignStats(c, tagged, orders, now, others = []) {
+  const base = baseline(c, tagged, others);
   const windows = [
     { key: 'h48', label: '48 ชม.', ms: 2 * DAY },
     { key: 'd7', label: '7 วัน', ms: 7 * DAY },
@@ -220,7 +236,7 @@ function build({ payments, orders, members = { active: 0, expiring: [] }, now = 
     byType,
     daily,
     hourly,
-    campaigns: campaigns.filter(c => c.at <= now).map(c => campaignStats(c, tagged, orders, now)).reverse(),
+    campaigns: campaigns.filter(c => c.at <= now).map(c => campaignStats(c, tagged, orders, now, campaigns)).reverse(),
     cohorts: cohorts(tagged, now),
   };
 }
@@ -246,4 +262,4 @@ async function load(db, now = Date.now()) {
   return build({ payments, orders, members: { active, expiring }, now });
 }
 
-module.exports = { build, load, median, tagPayments, campaignStats, cohorts, bkkDay, campaignList, CAMPAIGNS };
+module.exports = { build, load, median, baseline, tagPayments, campaignStats, cohorts, bkkDay, campaignList, CAMPAIGNS };

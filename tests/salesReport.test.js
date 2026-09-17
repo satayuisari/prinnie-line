@@ -81,6 +81,19 @@ describe('วัดผลแคมเปญ', () => {
   const c = rep.campaigns[0];
 
   test('ฐานปกติ = วันละ 399', () => assert.equal(c.baseDaily, 399));
+  test('ฐานไม่นับวันพีคของแคมเปญก่อนหน้า และไม่เป็น 0 เมื่อวันปกติขายได้ประปราย', () => {
+    const prev = launch - 5 * D;
+    const ps = [
+      ...Array.from({ length: 30 }, (_, i) => pay('p' + i, new Date(prev + H).toISOString())),  // พีค 11,970 วันเดียว
+      pay('q1', new Date(launch - 12 * D).toISOString()),
+      pay('q2', new Date(launch - 10 * D).toISOString()),
+    ];
+    const tagged = r.tagPayments(ps);
+    const cs = [{ name: 'ก่อน', at: prev }, { name: 'นี้', at: launch }];
+    // แคมเปญก่อนยิง 11 ก.ย. 21:00 → ตัด 11–15 ก.ย. (5 วัน) เหลือวันปกติ 9 วัน ขายได้ 798 → 89/วัน
+    assert.equal(Math.round(r.baseline(cs[1], tagged, cs)), 89);
+    assert.equal(r.median([...Array(12).fill(0), 399, 399]), 0);   // เหตุผลที่เลิกใช้มัธยฐาน
+  });
   test('48 ชม. ยังไม่ครบ → คิดเท่าที่ผ่านมา', () => {
     const w = c.windows[0];
     assert.equal(w.done, false);
