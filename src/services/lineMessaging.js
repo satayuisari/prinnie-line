@@ -1,4 +1,5 @@
 const line = require('@line/bot-sdk');
+const copyGuard = require('./copyGuard');
 
 const client = new line.messagingApi.MessagingApiClient({
   channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
@@ -58,10 +59,14 @@ async function replyMessage(replyToken, messages) {
 }
 
 // ⚠️ broadcast = ส่งหาทุกคน — gate ไว้ ห้ามเรียกตอน TEST_MODE
+// ⚠️ ด่านสุดท้ายก่อนถึงคนจริง: ทุกบรอดแคสต์ผ่าน copyGuard เสมอ
+// 16 ก.ย. 69 ข้อความเปิดตัวหัว "ดวงเลือกคุณ" ถูกส่งหาทุกคน เพราะตัวเขียนข้อความ
+// ไม่ได้เรียกด่านเอง การตรวจตอนเขียนต้องอาศัยความจำ การตรวจตอนส่งไม่ต้อง
 async function broadcast(messages) {
   if (TEST_MODE) {
     throw new Error('[TEST_MODE] ❌ broadcast ถูกบล็อก — จะส่งหาทุกคน!');
   }
+  copyGuard.assertMessagesClean(messages);
   return client.broadcast({
     messages: Array.isArray(messages) ? messages : [messages],
   });
@@ -88,6 +93,7 @@ async function oa2Client() {
 // broadcast บัญชีใหญ่ — gate TEST_MODE เหมือนกัน
 async function broadcastOA2(messages) {
   if (TEST_MODE) throw new Error('[TEST_MODE] ❌ broadcast OA2 ถูกบล็อก');
+  copyGuard.assertMessagesClean(messages);
   const c = await oa2Client();
   return c.broadcast({ messages: Array.isArray(messages) ? messages : [messages] });
 }

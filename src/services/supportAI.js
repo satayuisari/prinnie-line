@@ -105,9 +105,33 @@ function todayBlock(now = new Date()) {
 }
 
 // ctx = บริบทลูกค้าจริง (สถานะสมาชิก/ชื่อ) ดึงจาก DB — ให้บอทตอบตรงตัวบุคคล ไม่เดา
+// โปรแกรมที่เปิดขายอยู่ ต้องมีอยู่ใน SYSTEM ไม่งั้นบอทจะตอบลูกค้าว่า "ไม่มีโปรนี้"
+//
+// 17 ก.ย. 69 เกิดจริง: เปิดจับรางวัลดูดวงฟรี แต่ไม่ได้อัปเดต SYSTEM
+// ผู้ได้รางวัลตัวจริงทักมาถาม บอทตอบว่าน่าจะเป็นข้อความหลอกลวง
+// ด่านนี้ทำให้ "ลืมอัปเดตบอท" กลายเป็น "บอทเงียบ" แทนที่จะเป็น "บอทตอบผิด"
+const LIVE_PROGRAMS = [
+  { id: 'จับรางวัลดูดวงฟรี', on: () => process.env.LOYALTY_ENABLED === 'true', mustSay: ['จับรางวัล'] },
+  { id: 'สมาชิก 399', on: () => true, mustSay: ['399'] },
+  { id: 'ผูกดวงคู่', on: () => true, mustSay: ['ผูกดวงคู่'] },
+];
+
+function knowledgeGaps(system = SYSTEM) {
+  return LIVE_PROGRAMS
+    .filter(p => p.on() && !p.mustSay.every(w => system.includes(w)))
+    .map(p => p.id);
+}
+
 async function generate(message, category, ctx) {
   const c = getClient();
   if (!c) return null;
+  const gaps = knowledgeGaps();
+  if (gaps.length) {
+    // เงียบดีกว่าตอบผิด — staff ตอบเองจาก dashboard เหมือนตอนปิดบอท
+    console.error('[supportAI] ไม่ตอบ: SYSTEM ยังไม่รู้จัก ' + gaps.join(', ') +
+                  ' — อัปเดต SYSTEM ใน src/services/supportAI.js ก่อนเปิดบอท');
+    return null;
+  }
   const ctxBlock = (ctx ? `\n\nข้อมูลลูกค้าคนนี้ (อ้างอิงให้ตรง ห้ามเดานอกเหนือจากนี้):\n${ctx}` : '') + todayBlock();
   try {
     const resp = await c.messages.create({
@@ -128,4 +152,4 @@ async function generate(message, category, ctx) {
 
 const isEnabled = () => !!process.env.ANTHROPIC_API_KEY;
 
-module.exports = { draft, generate, isEnabled };
+module.exports = { draft, generate, isEnabled, knowledgeGaps, LIVE_PROGRAMS };
