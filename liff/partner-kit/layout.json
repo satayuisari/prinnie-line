@@ -1,0 +1,47 @@
+{
+  "feed-daily": {
+    "width": 1080,
+    "height": 1350,
+    "qr": {
+      "x": 764,
+      "y": 985,
+      "size": 250
+    }
+  },
+  "feed-couple": {
+    "width": 1080,
+    "height": 1350,
+    "qr": {
+      "x": 764,
+      "y": 985,
+      "size": 250
+    }
+  },
+  "feed-tarot": {
+    "width": 1080,
+    "height": 1350,
+    "qr": {
+      "x": 764,
+      "y": 985,
+      "size": 250
+    }
+  },
+  "story-daily": {
+    "width": 1080,
+    "height": 1920,
+    "qr": {
+      "x": 400,
+      "y": 1440,
+      "size": 280
+    }
+  },
+  "story-couple": {
+    "width": 1080,
+    "height": 1920,
+    "qr": {
+      "x": 400,
+      "y": 1440,
+      "size": 280
+    }
+  }
+}

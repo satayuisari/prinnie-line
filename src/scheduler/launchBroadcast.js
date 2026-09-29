@@ -72,6 +72,19 @@ async function firePickAnnounce() {
   await db.query('UPDATE loyalty_rewards SET announced_at=NOW() WHERE id=$1', [row.id]).catch(() => {});
 }
 
+// เตือนล่วงหน้าก่อนวันจับรางวัล — ยิงครั้งเดียวตอน PICK_REMINDER_AT เข้า @prinnie333 เท่านั้น
+// bon 26 ก.ย. 69 เลือกบัญชีบริการอย่างเดียว (บัญชีใหญ่โควตาหมดบ่อย) · ไม่เปิดชื่อผู้ได้รับ
+async function firePickReminder() {
+  const at = process.env.PICK_REMINDER_AT;
+  if (!at) return;
+  const t = new Date(at).getTime();
+  if (!Number.isFinite(t)) { console.error('[launch] PICK_REMINDER_AT อ่านไม่ออก:', at); return; }
+  if (Date.now() < t || Date.now() - t > 24 * 3600e3) return;
+  const announce = require('../services/pickAnnounce');
+  await send('pick-reminder-oa1-' + at, () => lineMessaging.broadcast([{ type: 'text',
+    text: announce.reminderText({ now: new Date() }) }]), 'เตือนก่อนจับรางวัล OA1');
+}
+
 async function fire() {
   const at = process.env.LAUNCH_BROADCAST_AT;
   if (!at) return;
@@ -88,10 +101,12 @@ function start() {
     fire().catch(e => console.error('[launch]', e.message));
     fireLoyalty().catch(e => console.error('[launch:loyalty]', e.message));
     firePickAnnounce().catch(e => console.error('[launch:pick]', e.message));
+    firePickReminder().catch(e => console.error('[launch:remind]', e.message));
   }, { timezone: 'Asia/Bangkok' });
   console.log('[launch] one-time broadcast watcher — ยิงตอน LAUNCH_BROADCAST_AT (ถ้าตั้งไว้)'
     + (process.env.LOYALTY_LAUNCH_AT ? ` · เปิดตัว ${process.env.LOYALTY_LAUNCH_AT}` : '')
-    + (process.env.PICK_ANNOUNCE_AT ? ` · ประกาศผลจับรางวัล ${process.env.PICK_ANNOUNCE_AT}` : ''));
+    + (process.env.PICK_ANNOUNCE_AT ? ` · ประกาศผลจับรางวัล ${process.env.PICK_ANNOUNCE_AT}` : '')
+    + (process.env.PICK_REMINDER_AT ? ` · เตือนก่อนจับรางวัล ${process.env.PICK_REMINDER_AT}` : ''));
 }
 
-module.exports = { start, fire, fireLoyalty, firePickAnnounce };
+module.exports = { start, fire, fireLoyalty, firePickAnnounce, firePickReminder };

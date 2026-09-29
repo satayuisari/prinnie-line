@@ -19,12 +19,10 @@ const lm = require('../src/services/lineMessaging');
 // ข้อความย้ายไป src/services/loyaltyLaunchText.js (ใช้ร่วมกับตัวยิงอัตโนมัติ LOYALTY_LAUNCH_AT)
 // เส้นตาย/รอบคิดสดตอนรัน (nextRound ใน pickAnnounce.js) — ห้ามฮาร์ดโค้ด เคยเป็นคำโกหกมาแล้ว
 const txt = require('../src/services/loyaltyLaunchText');
-const IMG = txt.IMG;
 const TEXT_OA1 = txt.textOA1();
 const TEXT_OA2 = txt.textOA2();
 
-const NO_IMAGE = process.argv.includes('--no-image');
-const msgs = (text) => txt.messages(text, { image: !NO_IMAGE });
+const msgs = (text) => txt.messages(text);   // ข้อความอย่างเดียว (ลบรูปดวงเลือกคุณแล้ว 29 ก.ย. 69)
 
 const arg = (n) => { const i = process.argv.indexOf(n); return i >= 0 ? process.argv[i + 1] : null; };
 const SEND = arg('--send');
@@ -32,7 +30,6 @@ const TO_ME = process.argv.includes('--to-me');
 
 function show() {
   const line = '─'.repeat(58);
-  console.log(`\nรูปที่จะแนบ: ${IMG}\n`);
   for (const [name, t] of [['@prinnie333 (บัญชีบริการ)', TEXT_OA1], ['@efb2738a (บัญชีใหญ่)', TEXT_OA2]]) {
     console.log(line);
     console.log(`  ${name}   ·   ${t.length} ตัวอักษร`);

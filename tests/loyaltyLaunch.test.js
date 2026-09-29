@@ -27,10 +27,12 @@ describe('ข้อความเปิดตัว', () => {
       assert.ok(!t.includes('จังหวะสำคัญ') && !t.includes('เจ้าของดวง'), 'ห้ามกลับไปใช้ถ้อยคำที่ชวนเข้าใจผิด');
     }
   });
-  test('รูป + ข้อความ = 2 ข้อความ · --no-image = 1', () => {
-    assert.equal(txt.messages('x').length, 2);
-    assert.equal(txt.messages('x', { image: false }).length, 1);
-    assert.ok(txt.messages('x')[0].originalContentUrl.endsWith('/duang-luek-khun.jpg'));
+  // bon 29 ก.ย. 69 สั่งลบรูปหัว "ดวงเลือกคุณ" — ห้ามกลับไปแนบรูปนั้นอีก
+  test('ส่งข้อความอย่างเดียว ไม่แนบรูปดวงเลือกคุณ', () => {
+    const m = txt.messages('x');
+    assert.equal(m.length, 1);
+    assert.equal(m[0].type, 'text');
+    assert.ok(!JSON.stringify(m).includes('duang-luek-khun'));
   });
 });
 
@@ -60,5 +62,13 @@ describe('ตัวยิงตามเวลา (ไม่แตะ DB ถ้�
       await launch.firePickAnnounce();
     }
     delete process.env.PICK_ANNOUNCE_AT;
+  });
+  test('เตือนก่อนจับรางวัล: ไม่ตั้ง / ยังไม่ถึง / เลย 1 วัน / อ่านไม่ออก = ไม่ยิง', async () => {
+    for (const v of [undefined, new Date(Date.now() + 3600e3).toISOString(),
+                     new Date(Date.now() - 2 * 86400e3).toISOString(), 'หนึ่งทุ่ม']) {
+      if (v === undefined) delete process.env.PICK_REMINDER_AT; else process.env.PICK_REMINDER_AT = v;
+      await launch.firePickReminder();
+    }
+    delete process.env.PICK_REMINDER_AT;
   });
 });

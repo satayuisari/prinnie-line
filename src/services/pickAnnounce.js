@@ -142,7 +142,33 @@ async function broadcastAnnouncement({ at, name, total }) {
   return out;
 }
 
+// เตือนล่วงหน้าก่อนวันจับ (bon 26 ก.ย. 69): "ใกล้วันสักสองวัน ประกาศหน่อยว่ารอบนี้กำลังจะ
+// ประกาศผล ใครยังไม่ทันอย่าลืมเป็นสมาชิก มีโอกาสรอบหน้า · ยังไม่ต้องเฉลยผู้โชคดี"
+// ไม่มีชื่อใคร และบอกชัดว่ายังไม่มีใครได้ — กันคนอ่านเข้าใจว่าตัวเองได้แล้ว
+// วันจับ = รอบถัดไปหลังวันนี้ · รอบที่คนสมัครวันนี้ทัน = nextRound (ต้องครบ MIN_DAYS) คิดสดทั้งคู่
+function reminderText({ now = new Date() } = {}) {
+  const draw = roundAfter(now);
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const days = Math.round((draw - today) / 86400e3);
+  const when = days === 1 ? 'พรุ่งนี้' : `อีก ${days} วัน`;
+  const next = nextRound(now);
+  return assertClean([
+    `${when} จับรางวัลดูดวงกับอาจารย์ รอบวันที่ ${thDate(draw)}ค่ะ`,
+    '',
+    `• ประกาศชื่อผู้ได้รับรางวัล: ${thDate(draw)} เวลา 20:00 น. ในไลน์ @prinnie333`,
+    '• รางวัล: ดูดวงตัวต่อตัวกับอาจารย์ปรินนี่ ฟรี 1 ชั่วโมง รอบละ 1 ท่าน',
+    `• ผู้มีสิทธิ์: สมาชิก 399 บาท ที่เป็นสมาชิกต่อเนื่องครบ ${MIN_DAYS} วัน`,
+    '',
+    `ตอนนี้ยังไม่มีใครได้รับรางวัลนะคะ ผลจะออกวันที่ ${thDate(draw)} เวลา 2 ทุ่ม`,
+    'ใครเป็นสมาชิกอยู่แล้ว ไม่ต้องทำอะไรเพิ่ม ระบบใส่ชื่อให้เองค่ะ',
+    '',
+    'ใครยังไม่ได้เป็นสมาชิก รอบนี้ไม่ทันแล้วนะคะ',
+    `สมัครตอนนี้ มีสิทธิ์ลุ้นรอบวันที่ ${next.round}ได้เลยค่ะ`,
+    `👉 ${SIGNUP_URL}`,
+  ].join('\n'));
+}
+
 module.exports = {
-  announceText, broadcastAnnouncement, describeDetail, nextRound, roundAfter, assertClean,
+  announceText, broadcastAnnouncement, reminderText, describeDetail, nextRound, roundAfter, assertClean,
   BANNED, TH_MONTH, TH_PLANET, TH_ASPECT, MIN_DAYS, SIGNUP_URL,
 };

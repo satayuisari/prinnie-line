@@ -322,6 +322,48 @@ describe('CRM + workflow ของแอดมิน', () => {
 });
 
 // ── ตัวเตือนออเดอร์ค้าง: ห้ามทวงคนที่จ่ายแล้ว (บั๊กจริง เกิดขึ้น 30 ครั้งบน production) ──
+// bon 29 ก.ย. 69: "ทำ affiliate ให้เสร็จ … ทำ artwork ให้สวย" — ชุดของให้พาร์ทเนอร์ต้องใช้ได้จริง
+describe('Promoter Kit + รูปพร้อม QR', () => {
+  const kit = require('../src/services/promoterKit');
+  const creative = require('../src/services/partnerCreative');
+  const sharp = require('sharp');
+
+  test('kit มีรูปครบ 5 แบบ ชี้ไปที่ลิงก์ดาวน์โหลดของคนนั้น', async () => {
+    await affiliates.create({ name: 'ครีเอเตอร์', code: 'kitcheck' });
+    const k = await kit.kit('kitcheck');
+    assert.equal(k.creatives.length, 5);
+    for (const c of k.creatives) assert.match(c.path, /^\/dashboard\/affiliate\/kitcheck\/creative\/[a-z-]+\.png$/);
+  });
+
+  test('รูปที่ได้เป็น PNG ขนาดเท่าต้นฉบับ และช่อง QR ไม่ว่างแล้ว', async () => {
+    await affiliates.create({ name: 'ครีเอเตอร์', code: 'qrcheck' });
+    for (const c of creative.list()) {
+      const png = await creative.render('qrcheck', c.name);
+      const meta = await sharp(png).metadata();
+      assert.equal(meta.format, 'png');
+      assert.equal(meta.width, c.width); assert.equal(meta.height, c.height);
+    }
+    // ช่อง QR ในภาพพื้นฐานเป็นสีขาวล้วน — หลังฝัง QR ต้องมีจุดสีเข้มในช่องนั้น
+    const spec = JSON.parse(require('fs').readFileSync('liff/partner-kit/layout.json', 'utf8'))['feed-daily'].qr;
+    const { data } = await sharp(await creative.render('qrcheck', 'feed-daily'))
+      .extract({ left: spec.x, top: spec.y, width: spec.size, height: spec.size }).raw().toBuffer({ resolveWithObject: true });
+    let dark = 0; for (let i = 0; i < data.length; i += 3) if (data[i] < 80) dark++;
+    assert.ok(dark > 1000, 'ต้องมี QR อยู่ในช่อง');
+  });
+
+  test('ชื่อไฟล์นอกรายการ / อินฟลูไม่มีจริง = error (กันอ่านไฟล์นอกโฟลเดอร์)', async () => {
+    await affiliates.create({ name: 'X', code: 'guard1' });
+    await assert.rejects(() => creative.render('guard1', '../../package'), /ไม่มีครีเอทีฟ/);
+    await assert.rejects(() => creative.render('nobody', 'feed-daily'), /ไม่พบอินฟลู/);
+  });
+
+  test('แคปชั่นไม่อ้างความแม่น และมีชุดสำหรับสายไลฟ์สไตล์', () => {
+    const c = kit.captions('https://x/go?a=t');
+    for (const s of [c.short, c.long, c.lifestyle, c.couple, ...c.cta]) assert.ok(!s.includes('แม่น'), s);
+    assert.ok(c.lifestyle.includes('https://x/go?a=t'));
+  });
+});
+
 describe('ตัวเตือนออเดอร์ค้าง', () => {
   test('ไม่ทวงลูกค้าที่เป็นสมาชิกอยู่แล้ว', async () => {
     const { remindPending } = require('../src/scheduler/pendingOrders');

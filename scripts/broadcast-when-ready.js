@@ -35,14 +35,7 @@ const head = async url => {
     'OA2 credential ครบ (ไลน์ผู้ติดตาม 10,000)',
     'ก๊อป LINE_CHANNEL_ID_2 / LINE_CHANNEL_SECRET_2 / LINE_CHANNEL_ACCESS_TOKEN_2 จาก Railway มาใส่ .env');
 
-  // 2. รูปแคมเปญต้องเป็นตัวใหม่ที่เขียน "ทุก 15 วัน" ไม่ใช่ตัวเก่า
-  const local = fs.existsSync('liff/duang-luek-khun.jpg') ? fs.statSync('liff/duang-luek-khun.jpg').size : 0;
-  const img = await head(`${HOST}/duang-luek-khun.jpg`);
-  check(img.code === 200, `รูปแคมเปญเสิร์ฟได้ (HTTP ${img.code})`, 'ยังไม่ deploy — รัน railway up --service prinnie-app --detach');
-  if (img.code === 200)
-    check(Math.abs(img.len - local) < 2048,
-      `รูปบนเซิร์ฟเวอร์เป็นตัวใหม่ (${(img.len/1024).toFixed(0)}KB เทียบในเครื่อง ${(local/1024).toFixed(0)}KB)`,
-      'รูปบนเซิร์ฟเวอร์ยังเป็นตัวเก่าที่เขียน "ทุกวันที่ 15" — deploy ใหม่');
+  // 2. (เดิมเช็กรูปแคมเปญ duang-luek-khun.jpg — ลบรูปทิ้งแล้ว 29 ก.ย. 69 ตามที่ bon สั่ง)
 
   // 3. รูปไพ่ — ค้างมาตั้งแต่โฮสต์เดิมล่ม deploy รอบนี้ควรแก้ไปด้วย
   const tarot = await head(`${HOST}/tarot/the-fool.jpg`);

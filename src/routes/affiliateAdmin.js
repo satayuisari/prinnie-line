@@ -7,6 +7,7 @@ const affiliates = require('../services/affiliates');
 const commission = require('../services/affiliateCommission');
 const candidates = require('../services/affiliateCandidates');
 const kit = require('../services/promoterKit');
+const partnerCreative = require('../services/partnerCreative');
 const audit = require('../services/affiliateAudit');
 const loyalty = require('../services/loyaltyReward');
 const askBrief = require('../services/askBrief');
@@ -289,7 +290,11 @@ const script = `
       j.text.replace(/[<>&]/g, c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))+'</pre>'+
       '<div class="irow"><button class="mini cp" onclick="copyText(document.getElementById(\\'kittext\\').textContent, this)">📋 COPY ทั้งชุด</button>'+
       '<button class="mini" onclick="copyText('+JSON.stringify(j.url)+', this)">📋 COPY LINK</button>'+
-      '<button class="mini" onclick="document.getElementById(\\'kitbox\\').innerHTML=\\'\\'">ปิด</button></div>';
+      '<button class="mini" onclick="document.getElementById(\\'kitbox\\').innerHTML=\\'\\'">ปิด</button></div>'+
+      '<div class="sec">🖼 รูปพร้อม QR ลิงก์ของ '+j.name+' (กดรูปเพื่อดาวน์โหลด)</div><div class="irow" style="flex-wrap:wrap;gap:10px">'+
+      (j.creatives||[]).map(c=>{ const u=c.path+'?key='+encodeURIComponent(KEY);
+        return '<a href="'+u+'&dl=1" style="text-align:center;font-size:12px;color:#ccc;text-decoration:none">'+
+          '<img src="'+u+'" loading="lazy" style="width:140px;border-radius:8px;display:block;margin-bottom:4px">'+c.label+'</a>'; }).join('')+'</div>';
     document.getElementById('kitbox').scrollIntoView({behavior:'smooth'});
   }
   async function showReport(code){
@@ -392,6 +397,16 @@ function register(app) {
   app.get('/dashboard/affiliate/:code/kit', async (req, res) => {
     if (!guard(req, res)) return;
     try { res.json(await kit.kit(req.params.code)); } catch (e) { fail(res, e); }
+  });
+
+  // ภาพครีเอทีฟที่ฝัง QR ลิงก์ของพาร์ทเนอร์คนนี้ — ?dl=1 ให้เบราว์เซอร์ดาวน์โหลดเป็นไฟล์
+  app.get('/dashboard/affiliate/:code/creative/:name.png', async (req, res) => {
+    if (!guard(req, res)) return;
+    try {
+      const png = await partnerCreative.render(req.params.code, req.params.name);
+      if (req.query.dl) res.attachment(`prinnie-${req.params.code}-${req.params.name}.png`);
+      res.type('png').send(png);
+    } catch (e) { fail(res, e); }
   });
 
   app.get('/dashboard/affiliate/:code/report', async (req, res) => {

@@ -5,8 +5,6 @@
 // เส้นตาย/รอบคิดสดจากวันที่ยิงจริง (nextRound) ห้ามฮาร์ดโค้ด — เคยเป็นคำโกหกมาแล้ว
 const { nextRound, assertClean } = require('./pickAnnounce');
 
-const BASE = (process.env.PUBLIC_BASE_URL || 'https://prinnie-app-production.up.railway.app').replace(/\/$/, '');
-const IMG = `${BASE}/duang-luek-khun.jpg`;      // ต้องมีไฟล์นี้ใน liff/ (เสิร์ฟเป็น static)
 const SIGNUP = 'https://liff.line.me/2010382680-c6gh82Rm';
 
 // bon 17 ก.ย. 69: ข้อความเดิม ("บางดวงกำลังมีจังหวะสำคัญ … เจ้าของดวงที่ได้รับเลือก")
@@ -47,11 +45,11 @@ function textOA2(now = new Date()) {
   return assertClean(body(nextRound(now), ['Prinnie333 คือบริการดวงส่วนตัวของอาจารย์ปรินนี่ทางไลน์', '']));
 }
 
-// รูป + ข้อความ (LINE ส่งได้สูงสุด 5 ข้อความต่อครั้ง — ใช้ 2)
-function messages(text, { image = true } = {}) {
-  return image
-    ? [{ type: 'image', originalContentUrl: IMG, previewImageUrl: IMG }, { type: 'text', text }]
-    : [{ type: 'text', text }];
+// ข้อความอย่างเดียว — ลบรูปหัว "ดวงเลือกคุณ" ทิ้งแล้ว (bon 29 ก.ย. 69)
+// เหตุ: copyGuard ตรวจได้แค่ตัวหนังสือ รูปที่มีคำต้องห้ามอยู่ในภาพจะหลุดออกไปได้ถ้ามีคนยิงซ้ำ
+// ถ้าจะกลับมาแนบรูป ต้องทำรูปใหม่ที่ไม่มีหัว "ดวงเลือกคุณ" ก่อน
+function messages(text) {
+  return [{ type: 'text', text }];
 }
 
-module.exports = { textOA1, textOA2, messages, IMG, SIGNUP };
+module.exports = { textOA1, textOA2, messages, SIGNUP };
