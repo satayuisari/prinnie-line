@@ -71,4 +71,12 @@ describe('ตัวยิงตามเวลา (ไม่แตะ DB ถ้�
     }
     delete process.env.PICK_REMINDER_AT;
   });
+  test('ชวนสมัครหลังประกาศผล: ไม่ตั้ง / ยังไม่ถึง / เลย 1 วัน / อ่านไม่ออก = ไม่ยิง', async () => {
+    for (const v of [undefined, new Date(Date.now() + 3600e3).toISOString(),
+                     new Date(Date.now() - 2 * 86400e3).toISOString(), 'พรุ่งนี้เช้า']) {
+      if (v === undefined) delete process.env.PICK_INVITE_AT; else process.env.PICK_INVITE_AT = v;
+      await launch.firePickInvite();
+    }
+    delete process.env.PICK_INVITE_AT;
+  });
 });

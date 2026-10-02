@@ -20,13 +20,18 @@ const { BANNED, assertClean } = require('./copyGuard');
 
 const thDate = (d) => `${d.getDate()} ${TH_MONTH[d.getMonth()]}`;
 
-// รอบแรกที่คนสมัคร "วันนี้" ยังทันจริง (ต้องเป็นสมาชิกครบ MIN_DAYS ก่อนวันคัด)
+// จับรางวัลตอน 20:00 (scheduler/loyaltyRewards.js) — ระบบนับครบ MIN_DAYS ถึงเวลานี้ของวันจับ
+// (monthlyPick.eligibleMembers: subscribe_start <= เวลาจับ − MIN_DAYS)
+const DRAW_HOUR = 20;
+
+// รอบแรกที่คนสมัคร "ตอนนี้" ยังทันจริง (ต้องเป็นสมาชิกครบ MIN_DAYS ก่อนเวลาจับ)
+// เดิมเทียบกับเที่ยงคืนของวันจับ → คนสมัครวันเส้นตายถูกบอกว่าไม่ทัน ทั้งที่ระบบนับให้ (แก้ 2 ต.ค. 69)
 function nextRound(now = new Date(), minDays = MIN_DAYS) {
   const eligible = new Date(now);
   eligible.setDate(eligible.getDate() + minDays);
   for (let i = 0; i < 8; i++) {
     for (const day of PICK_DAYS) {
-      const round = new Date(now.getFullYear(), now.getMonth() + i, day);
+      const round = new Date(now.getFullYear(), now.getMonth() + i, day, DRAW_HOUR);
       if (round >= eligible) {
         const cut = new Date(round);
         cut.setDate(cut.getDate() - minDays);
@@ -89,7 +94,7 @@ function announceText({ at = new Date(), name, total, forOA2 = false } = {}) {
   // bon 17 ก.ย. 69: "ให้คำแนะนำว่าทำยังไงถึงจะมีสิทธิ์ในรอบต่อไปด้วย"
   // รอบที่คนสมัครวันนี้ทันจริง อาจไม่ใช่รอบถัดไป (ต้องเป็นสมาชิกครบ MIN_DAYS วันก่อน)
   const nextLine = `📅 จับรางวัลรอบถัดไป ${after ? thDate(after) : next.round}`;
-  const sameRound = after && next.roundDate.getTime() === after.getTime();
+  const sameRound = after && next.roundDate.toDateString() === after.toDateString();
   const howTo = sameRound
     ? `อยากมีสิทธิ์ลุ้นรอบ ${next.round} ทำแบบนี้ค่ะ`
     : `คนที่สมัครวันนี้ จะมีสิทธิ์รอบ ${next.round} (สมัครภายใน ${next.cutoff}) ทำแบบนี้ค่ะ`;
@@ -168,7 +173,47 @@ function reminderText({ now = new Date() } = {}) {
   ].join('\n'));
 }
 
+// รอบจับที่ผ่านมาล่าสุด (วันที่ 2/17 ที่ไม่เกินวันนี้)
+function roundBefore(at = new Date()) {
+  const d = new Date(at.getFullYear(), at.getMonth(), at.getDate());
+  for (let i = 0; i < 3; i++) {
+    for (const day of [...PICK_DAYS].reverse()) {
+      const r = new Date(d.getFullYear(), d.getMonth() - i, day);
+      if (r <= d) return r;
+    }
+  }
+  return null;
+}
+
+// ชวนคนที่ยังไม่เป็นสมาชิกหลังประกาศผล (bon 2 ต.ค. 69): "ทำข้อความเชิญชวนคนที่ยังไม่ได้เป็น
+// สมาชิกให้มาสมัครเพราะมีสิทธิ์ลุ้นดูดวง เชิงว่าอาจจะเป็นคุณก็ได้รอบหน้า"
+// ไม่เปิดชื่อผู้ได้รับ · บอกเส้นตายจริงของรอบหน้า (ครบ MIN_DAYS) และรอบถัดไปถ้าไม่ทัน
+function inviteText({ now = new Date() } = {}) {
+  const last = roundBefore(now);
+  const next = nextRound(now);
+  const cutToday = next.cutoffDate.toDateString() === now.toDateString();
+  const after = roundAfter(next.roundDate);
+  return assertClean([
+    'รอบหน้า อาจเป็นคุณก็ได้นะคะ 💫',
+    '',
+    last ? `รอบ ${thDate(last)} อาจารย์จับรางวัลดูดวงตัวต่อตัวฟรี 1 ชั่วโมง ให้สมาชิก 1 ท่านไปแล้ว` : '',
+    `รอบหน้าจับวันที่ ${next.round} เวลา 20:00 น.`,
+    '',
+    'อยากมีสิทธิ์ลุ้นรอบหน้า ทำแบบนี้ค่ะ',
+    `1. สมัครสมาชิก Prinnie333 (399 บาท / 30 วัน) ${cutToday ? `ภายในวันนี้ ${thDate(next.cutoffDate)} ก่อน 2 ทุ่ม` : `ภายใน ${next.cutoff}`}`,
+    `   ต้องเป็นสมาชิกครบ ${MIN_DAYS} วันก่อนวันจับรางวัล`,
+    '2. กรอกวัน เวลา และสถานที่เกิดให้ครบ',
+    'ไม่ต้องลงทะเบียนเพิ่ม ระบบใส่ชื่อสมาชิกที่มีสิทธิ์ให้เองค่ะ',
+    '',
+    'สมาชิกยังได้ดวงรายวันเฉพาะคุณทุกเช้า 8 โมง',
+    'คำนวณจากวัน เวลา และสถานที่เกิดของคุณเอง',
+    '',
+    after ? `สมัครไม่ทัน ${next.cutoff} ก็ยังได้ลุ้นรอบ ${thDate(after)} ค่ะ` : '',
+    `👉 สมัครสมาชิก ${SIGNUP_URL}`,
+  ].filter((l, i, a) => !(l === '' && a[i - 1] === '')).join('\n'));
+}
+
 module.exports = {
-  announceText, broadcastAnnouncement, reminderText, describeDetail, nextRound, roundAfter, assertClean,
+  announceText, broadcastAnnouncement, reminderText, inviteText, roundBefore, describeDetail, nextRound, roundAfter, assertClean,
   BANNED, TH_MONTH, TH_PLANET, TH_ASPECT, MIN_DAYS, SIGNUP_URL,
 };

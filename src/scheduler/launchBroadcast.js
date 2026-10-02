@@ -85,6 +85,21 @@ async function firePickReminder() {
     text: announce.reminderText({ now: new Date() }) }]), 'เตือนก่อนจับรางวัล OA1');
 }
 
+// ชวนคนที่ยังไม่เป็นสมาชิกหลังประกาศผล — ยิงครั้งเดียวตอน PICK_INVITE_AT
+// bon 2 ต.ค. 69: "อาจจะเป็นคุณก็ได้รอบหน้า" · เข้า @prinnie333 เสมอ · บัญชีใหญ่เฉพาะเมื่อ PICK_INVITE_OA2=true
+async function firePickInvite() {
+  const at = process.env.PICK_INVITE_AT;
+  if (!at) return;
+  const t = new Date(at).getTime();
+  if (!Number.isFinite(t)) { console.error('[launch] PICK_INVITE_AT อ่านไม่ออก:', at); return; }
+  if (Date.now() < t || Date.now() - t > 24 * 3600e3) return;
+  const announce = require('../services/pickAnnounce');
+  const msg = () => [{ type: 'text', text: announce.inviteText({ now: new Date() }) }];
+  await send('pick-invite-oa1-' + at, () => lineMessaging.broadcast(msg()), 'ชวนสมัครหลังประกาศผล OA1');
+  if (process.env.PICK_INVITE_OA2 === 'true' && lineMessaging.oa2Enabled())
+    await send('pick-invite-oa2-' + at, () => lineMessaging.broadcastOA2(msg()), 'ชวนสมัครหลังประกาศผล OA2');
+}
+
 async function fire() {
   const at = process.env.LAUNCH_BROADCAST_AT;
   if (!at) return;
@@ -102,11 +117,13 @@ function start() {
     fireLoyalty().catch(e => console.error('[launch:loyalty]', e.message));
     firePickAnnounce().catch(e => console.error('[launch:pick]', e.message));
     firePickReminder().catch(e => console.error('[launch:remind]', e.message));
+    firePickInvite().catch(e => console.error('[launch:invite]', e.message));
   }, { timezone: 'Asia/Bangkok' });
   console.log('[launch] one-time broadcast watcher — ยิงตอน LAUNCH_BROADCAST_AT (ถ้าตั้งไว้)'
     + (process.env.LOYALTY_LAUNCH_AT ? ` · เปิดตัว ${process.env.LOYALTY_LAUNCH_AT}` : '')
     + (process.env.PICK_ANNOUNCE_AT ? ` · ประกาศผลจับรางวัล ${process.env.PICK_ANNOUNCE_AT}` : '')
-    + (process.env.PICK_REMINDER_AT ? ` · เตือนก่อนจับรางวัล ${process.env.PICK_REMINDER_AT}` : ''));
+    + (process.env.PICK_REMINDER_AT ? ` · เตือนก่อนจับรางวัล ${process.env.PICK_REMINDER_AT}` : '')
+    + (process.env.PICK_INVITE_AT ? ` · ชวนสมัคร ${process.env.PICK_INVITE_AT}${process.env.PICK_INVITE_OA2 === 'true' ? ' (2 บัญชี)' : ''}` : ''));
 }
 
-module.exports = { start, fire, fireLoyalty, firePickAnnounce, firePickReminder };
+module.exports = { start, fire, fireLoyalty, firePickAnnounce, firePickReminder, firePickInvite };

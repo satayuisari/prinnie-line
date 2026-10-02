@@ -112,3 +112,27 @@ describe('ข้อความเตือนก่อนวันจับร�
     for (const w of ann.BANNED) assert.ok(!t.includes(w), w);
   });
 });
+
+// bon 2 ต.ค. 69: ชวนคนที่ยังไม่เป็นสมาชิกหลังประกาศผล "อาจจะเป็นคุณก็ได้รอบหน้า"
+describe('เส้นตายนับถึงเวลาจับ 20:00 (ตรงกับ monthlyPick.eligibleMembers)', () => {
+  test('สมัคร 3 ต.ค. ก่อน 2 ทุ่ม → ทันรอบ 17 ต.ค. · หลัง 2 ทุ่ม → รอบ 2 พ.ย.', () => {
+    assert.equal(ann.nextRound(new Date(2026, 9, 3, 10)).round, '17 ตุลาคม');
+    assert.equal(ann.nextRound(new Date(2026, 9, 3, 19, 59)).round, '17 ตุลาคม');
+    assert.equal(ann.nextRound(new Date(2026, 9, 3, 20, 1)).round, '2 พฤศจิกายน');
+  });
+});
+
+describe('ข้อความชวนสมัครหลังประกาศผล', () => {
+  const t = ann.inviteText({ now: new Date(2026, 9, 3, 10) });
+  test('3 ต.ค. เช้า: รอบที่แล้ว 2 ต.ค. · รอบหน้า 17 ต.ค. · สมัครภายในวันนี้ก่อน 2 ทุ่ม', () => {
+    assert.ok(t.startsWith('รอบหน้า อาจเป็นคุณก็ได้นะคะ'));
+    assert.ok(t.includes('รอบ 2 ตุลาคม อาจารย์จับรางวัล'));
+    assert.ok(t.includes('รอบหน้าจับวันที่ 17 ตุลาคม เวลา 20:00 น.'));
+    assert.ok(t.includes('ภายในวันนี้ 3 ตุลาคม ก่อน 2 ทุ่ม'));
+    assert.ok(t.includes('ยังได้ลุ้นรอบ 2 พฤศจิกายน'));
+  });
+  test('ไม่เปิดชื่อผู้ได้รับ ไม่มีคำต้องห้าม', () => {
+    assert.ok(!t.includes('ผู้โชคดีรอบนี้ คือ'));
+    for (const w of ann.BANNED) assert.ok(!t.includes(w), w);
+  });
+});
