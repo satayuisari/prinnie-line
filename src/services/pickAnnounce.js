@@ -193,11 +193,17 @@ function inviteText({ now = new Date() } = {}) {
   const next = nextRound(now);
   const cutToday = next.cutoffDate.toDateString() === now.toDateString();
   const after = roundAfter(next.roundDate);
+  // รอบจับถัดไปจริง อาจไม่ใช่รอบที่คนสมัครตอนนี้ทัน (ปิดรับเมื่อเหลือไม่ถึง MIN_DAYS) — บอกให้ชัดทั้งสองรอบ
+  const upcoming = roundAfter(now);
+  const closed = upcoming && upcoming.toDateString() !== next.roundDate.toDateString();
   return assertClean([
     'รอบหน้า อาจเป็นคุณก็ได้นะคะ 💫',
     '',
     last ? `รอบ ${thDate(last)} อาจารย์จับรางวัลดูดวงตัวต่อตัวฟรี 1 ชั่วโมง ให้สมาชิก 1 ท่านไปแล้ว` : '',
-    `รอบหน้าจับวันที่ ${next.round} เวลา 20:00 น.`,
+    ...(closed
+      ? [`รอบ ${thDate(upcoming)} เป็นของสมาชิกที่สมัครครบ ${MIN_DAYS} วันแล้ว`,
+         `ถ้าสมัครตอนนี้ มีสิทธิ์ลุ้นรอบ ${next.round} เวลา 20:00 น.`]
+      : [`รอบหน้าจับวันที่ ${next.round} เวลา 20:00 น.`]),
     '',
     'อยากมีสิทธิ์ลุ้นรอบหน้า ทำแบบนี้ค่ะ',
     `1. สมัครสมาชิก Prinnie333 (399 บาท / 30 วัน) ${cutToday ? `ภายในวันนี้ ${thDate(next.cutoffDate)} ก่อน 2 ทุ่ม` : `ภายใน ${next.cutoff}`}`,
