@@ -33,6 +33,21 @@ const cycleOf = (d) =>
 //
 // ⚠️ "ยังใช้งานอยู่" ต้องเช็ก subscribe_end ด้วย ไม่ใช่ status อย่างเดียว —
 //    เดิมคนที่หมดอายุแล้ว 31 คนเข้าเกณฑ์ชิงสิทธิ์ได้ เพราะ status ค้างเป็น ACTIVE
+// ขยายเส้นตายรายรอบ (PICK_CUTOFF_EXTEND="2026-10-B=2026-10-03T23:59:59+07:00,...")
+// ใช้เมื่อเราประกาศเส้นตายผิดไปแล้ว ต้องรักษาคำพูดกับลูกค้า — ขยายได้อย่างเดียว ไม่หดเกณฑ์ปกติ
+// 3 ต.ค. 69: บรอดแคสต์บัญชีใหญ่ตอน 20:00 บอกว่า "สมัครภายในวันนี้ก่อน 2 ทุ่ม ทันรอบ 17 ต.ค."
+// (บั๊กเขตเวลา) → bon ให้จัดการตามเห็นสมควร: นับคนที่สมัครภายใน 3 ต.ค. ทั้งวันให้รอบนี้
+function cutoffFor(at) {
+  const normal = new Date(at.getTime() - MIN_MEMBER_DAYS * 86400e3);
+  const cycle = cycleOf(at);
+  for (const part of String(process.env.PICK_CUTOFF_EXTEND || '').split(',')) {
+    const [c, ts] = part.split('=').map(s => (s || '').trim());
+    const ext = new Date(ts);
+    if (c === cycle && Number.isFinite(ext.getTime()) && ext > normal) return ext;
+  }
+  return normal;
+}
+
 async function eligibleMembers(at = new Date()) {
   return (await db.query(`
     SELECT s.line_user_id, s.nickname, s.display_name, s.chart_data
@@ -43,14 +58,14 @@ async function eligibleMembers(at = new Date()) {
       AND s.payment_ref IS NOT NULL
       AND s.payment_ref NOT IN ('tester','free-trial','free','founder','LIFETIME_COMP')
       AND s.subscribe_start IS NOT NULL
-      AND s.subscribe_start <= $1::timestamp - ($2 || ' days')::interval
+      AND s.subscribe_start <= $2::timestamp
       AND NOT EXISTS (
         SELECT 1 FROM loyalty_rewards r
         WHERE r.line_user_id = s.line_user_id
           AND r.cycle IS NOT NULL
           AND r.granted_at > $1::timestamp - ($3 || ' months')::interval
       )`,
-    [at.toISOString(), String(MIN_MEMBER_DAYS), String(COOLDOWN_MONTHS)])).rows;
+    [at.toISOString(), cutoffFor(at).toISOString(), String(COOLDOWN_MONTHS)])).rows;
 }
 
 // ให้คะแนนหนึ่งคน: มุมที่แรงที่สุดจากดาวช้า × น้ำหนักของดาวดวงนั้น
@@ -146,6 +161,6 @@ function pickMessage(name) {
 
 module.exports = {
   drawOne, seedOf,
-  rank, pickForCycle, eligibleMembers, scoreMember, pickMessage, cycleOf,
+  rank, pickForCycle, eligibleMembers, scoreMember, pickMessage, cycleOf, cutoffFor,
   WEIGHT, MIN_WEIGHT, COOLDOWN_MONTHS, MIN_MEMBER_DAYS, REWARD, EXPIRE_DAYS,
 };

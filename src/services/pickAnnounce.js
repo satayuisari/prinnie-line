@@ -18,23 +18,32 @@ const SIGNUP_URL = process.env.SIGNUP_LIFF_URL || 'https://liff.line.me/20103826
 // เรียกตอนจะส่งจริงได้โดยไม่วนกันเอง · ที่นี่ re-export ไว้ ของเดิมที่เรียกอยู่ไม่ต้องแก้
 const { BANNED, assertClean } = require('./copyGuard');
 
-const thDate = (d) => `${d.getDate()} ${TH_MONTH[d.getMonth()]}`;
+// ⚠️ เวลาไทยเสมอ — เซิร์ฟเวอร์ Railway ใช้ UTC (ไม่ได้ตั้ง TZ) · เดิมใช้ new Date(y,m,d,h) ตามเขตเวลาเครื่อง
+// บน Mac (เวลาไทย) ถูก แต่บนเซิร์ฟเวอร์คลาด 7 ชม. → 3 ต.ค. 69 ข้อความที่ส่งตอน 20:00 บอกว่า
+// "สมัครภายในวันนี้ก่อน 2 ทุ่ม" ทั้งที่เลยเส้นตายแล้ว · ทุกฟังก์ชันวันที่ในไฟล์นี้ต้องผ่าน helper ข้างล่าง
+const BKK_OFFSET = 7 * 3600e3;
+const bkk = (d) => { const x = new Date(d.getTime() + BKK_OFFSET);
+  return { y: x.getUTCFullYear(), m: x.getUTCMonth(), d: x.getUTCDate() }; };
+// เวลา h:00 ของวันที่ (y, m, d) ตามเวลาไทย — เดือน/วันล้นได้เหมือน Date ปกติ
+const bkkAt = (y, m, d, h = 0) => new Date(Date.UTC(y, m, d, h) - BKK_OFFSET);
+const sameDay = (a, b) => { const x = bkk(a), y = bkk(b); return x.y === y.y && x.m === y.m && x.d === y.d; };
+const thDate = (d) => { const p = bkk(d); return `${p.d} ${TH_MONTH[p.m]}`; };
 
-// จับรางวัลตอน 20:00 (scheduler/loyaltyRewards.js) — ระบบนับครบ MIN_DAYS ถึงเวลานี้ของวันจับ
+// จับรางวัลตอน 20:00 เวลาไทย (scheduler/loyaltyRewards.js) — ระบบนับครบ MIN_DAYS ถึงเวลานี้ของวันจับ
 // (monthlyPick.eligibleMembers: subscribe_start <= เวลาจับ − MIN_DAYS)
 const DRAW_HOUR = 20;
+const DAY = 86400e3;
 
 // รอบแรกที่คนสมัคร "ตอนนี้" ยังทันจริง (ต้องเป็นสมาชิกครบ MIN_DAYS ก่อนเวลาจับ)
 // เดิมเทียบกับเที่ยงคืนของวันจับ → คนสมัครวันเส้นตายถูกบอกว่าไม่ทัน ทั้งที่ระบบนับให้ (แก้ 2 ต.ค. 69)
 function nextRound(now = new Date(), minDays = MIN_DAYS) {
-  const eligible = new Date(now);
-  eligible.setDate(eligible.getDate() + minDays);
+  const eligible = new Date(now.getTime() + minDays * DAY);
+  const p = bkk(now);
   for (let i = 0; i < 8; i++) {
     for (const day of PICK_DAYS) {
-      const round = new Date(now.getFullYear(), now.getMonth() + i, day, DRAW_HOUR);
+      const round = bkkAt(p.y, p.m + i, day, DRAW_HOUR);
       if (round >= eligible) {
-        const cut = new Date(round);
-        cut.setDate(cut.getDate() - minDays);
+        const cut = new Date(round.getTime() - minDays * DAY);
         return { round: thDate(round), cutoff: thDate(cut), roundDate: round, cutoffDate: cut };
       }
     }
@@ -43,12 +52,14 @@ function nextRound(now = new Date(), minDays = MIN_DAYS) {
 }
 
 // รอบถัดไปหลังวันคัด at (ไม่ใช่รอบที่คนสมัครวันนี้ทัน) — ไว้บอกว่า "รอบหน้าคือวันไหน"
+// คืนเที่ยงคืนเวลาไทยของวันจับ
 function roundAfter(at = new Date()) {
-  const d = new Date(at.getFullYear(), at.getMonth(), at.getDate());
+  const p = bkk(at);
+  const today = bkkAt(p.y, p.m, p.d);
   for (let i = 0; i < 3; i++) {
     for (const day of PICK_DAYS) {
-      const r = new Date(d.getFullYear(), d.getMonth() + i, day);
-      if (r > d) return r;
+      const r = bkkAt(p.y, p.m + i, day);
+      if (r > today) return r;
     }
   }
   return null;
@@ -94,7 +105,7 @@ function announceText({ at = new Date(), name, total, forOA2 = false } = {}) {
   // bon 17 ก.ย. 69: "ให้คำแนะนำว่าทำยังไงถึงจะมีสิทธิ์ในรอบต่อไปด้วย"
   // รอบที่คนสมัครวันนี้ทันจริง อาจไม่ใช่รอบถัดไป (ต้องเป็นสมาชิกครบ MIN_DAYS วันก่อน)
   const nextLine = `📅 จับรางวัลรอบถัดไป ${after ? thDate(after) : next.round}`;
-  const sameRound = after && next.roundDate.toDateString() === after.toDateString();
+  const sameRound = after && sameDay(next.roundDate, after);
   const howTo = sameRound
     ? `อยากมีสิทธิ์ลุ้นรอบ ${next.round} ทำแบบนี้ค่ะ`
     : `คนที่สมัครวันนี้ จะมีสิทธิ์รอบ ${next.round} (สมัครภายใน ${next.cutoff}) ทำแบบนี้ค่ะ`;
@@ -153,7 +164,8 @@ async function broadcastAnnouncement({ at, name, total }) {
 // วันจับ = รอบถัดไปหลังวันนี้ · รอบที่คนสมัครวันนี้ทัน = nextRound (ต้องครบ MIN_DAYS) คิดสดทั้งคู่
 function reminderText({ now = new Date() } = {}) {
   const draw = roundAfter(now);
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const tp = bkk(now);
+  const today = bkkAt(tp.y, tp.m, tp.d);
   const days = Math.round((draw - today) / 86400e3);
   const when = days === 1 ? 'พรุ่งนี้' : `อีก ${days} วัน`;
   const next = nextRound(now);
@@ -175,11 +187,12 @@ function reminderText({ now = new Date() } = {}) {
 
 // รอบจับที่ผ่านมาล่าสุด (วันที่ 2/17 ที่ไม่เกินวันนี้)
 function roundBefore(at = new Date()) {
-  const d = new Date(at.getFullYear(), at.getMonth(), at.getDate());
+  const p = bkk(at);
+  const today = bkkAt(p.y, p.m, p.d);
   for (let i = 0; i < 3; i++) {
     for (const day of [...PICK_DAYS].reverse()) {
-      const r = new Date(d.getFullYear(), d.getMonth() - i, day);
-      if (r <= d) return r;
+      const r = bkkAt(p.y, p.m - i, day);
+      if (r <= today) return r;
     }
   }
   return null;
@@ -191,11 +204,11 @@ function roundBefore(at = new Date()) {
 function inviteText({ now = new Date() } = {}) {
   const last = roundBefore(now);
   const next = nextRound(now);
-  const cutToday = next.cutoffDate.toDateString() === now.toDateString();
+  const cutToday = sameDay(next.cutoffDate, now);
   const after = roundAfter(next.roundDate);
   // รอบจับถัดไปจริง อาจไม่ใช่รอบที่คนสมัครตอนนี้ทัน (ปิดรับเมื่อเหลือไม่ถึง MIN_DAYS) — บอกให้ชัดทั้งสองรอบ
   const upcoming = roundAfter(now);
-  const closed = upcoming && upcoming.toDateString() !== next.roundDate.toDateString();
+  const closed = upcoming && !sameDay(upcoming, next.roundDate);
   return assertClean([
     'รอบหน้า อาจเป็นคุณก็ได้นะคะ 💫',
     '',
@@ -220,6 +233,6 @@ function inviteText({ now = new Date() } = {}) {
 }
 
 module.exports = {
-  announceText, broadcastAnnouncement, reminderText, inviteText, roundBefore, describeDetail, nextRound, roundAfter, assertClean,
+  announceText, broadcastAnnouncement, reminderText, inviteText, roundBefore, thDate, bkkAt, describeDetail, nextRound, roundAfter, assertClean,
   BANNED, TH_MONTH, TH_PLANET, TH_ASPECT, MIN_DAYS, SIGNUP_URL,
 };
