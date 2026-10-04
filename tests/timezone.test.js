@@ -54,3 +54,22 @@ describe('ขยายเส้นตายรายรอบ (รักษา�
     delete process.env.PICK_CUTOFF_EXTEND;
   });
 });
+
+// bon 4 ต.ค. 69 อนุมัติข้อความ winback ใหม่
+describe('ข้อความชวนสมาชิกเก่ากลับมา (winback)', () => {
+  const winback = require('../src/services/winback');
+  const t = winback.buildMessage('• Nanear •', bkk('2026-09-30T23:30:00'), { now: bkk('2026-10-04T19:00:00') });
+  test('ชื่อสะอาด · วันที่หมดอายุเป็นวันที่ไทย (ไม่ใช่ 30 ก.ย. ตาม UTC ผิดวัน)', () => {
+    assert.ok(t.startsWith('คุณNanear คะ'));
+    assert.ok(t.includes('หยุดส่งไปตั้งแต่ 30 กันยายน'));
+  });
+  test('กติกาปัจจุบัน: จับรางวัล รอบละ 1 ท่าน ครบ 14 วัน · กลับมา 4 ต.ค. ได้รอบ 2 พ.ย.', () => {
+    assert.ok(t.includes('จับรางวัลทุกวันที่ 2 และ 17 ของเดือน รอบละ 1 ท่าน'));
+    assert.ok(t.includes('ต่อเนื่องครบ 14 วัน'));
+    assert.ok(t.includes('ได้ลุ้นรอบ 2 พฤศจิกายน'));
+  });
+  test('ไม่มีกติกาเก่า/ศัพท์ต้องห้าม', () => {
+    for (const w of ['ทำมุม', 'ไม่ใช่การจับรางวัล', 'ขอแค่เป็นสมาชิกอยู่ในวันนั้น', 'กำลังจะเริ่ม'])
+      assert.ok(!t.includes(w), w);
+  });
+});

@@ -26,11 +26,11 @@ async function main() {
   if (limit) rows = rows.slice(0, limit);
 
   console.log(`กลุ่มเป้าหมาย: ${rows.length} คน (สมาชิกเก่าที่หมดอายุ)`);
-  for (const r of rows.slice(0, 8)) console.log(`  ${(r.name || '-').slice(0, 20).padEnd(22)} หมด ${r.ended}`);
+  for (const r of rows.slice(0, 8)) console.log(`  ${(r.name || '-').slice(0, 20).padEnd(22)} หมด ${r.ended instanceof Date ? r.ended.toISOString().slice(0, 10) : r.ended}`);
   if (rows.length > 8) console.log(`  … อีก ${rows.length - 8} คน`);
 
   if (preview) {
-    const sample = rows[0] || { name: 'ตัวอย่าง', ended: '01/08' };
+    const sample = rows[0] || { name: 'ตัวอย่าง', ended: new Date() };
     const text = '🧪 ตัวอย่างข้อความชวนสมาชิกเก่ากลับมา (ยังไม่ได้ส่งถึงลูกค้า)\n──────────\n\n'
       + winback.buildMessage(sample.name, sample.ended);
     for (const [id, who] of TEAM) {
