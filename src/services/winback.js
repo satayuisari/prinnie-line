@@ -16,7 +16,8 @@ const AUDIENCE_SQL = `
   WHERE payment_ref IS NOT NULL
     AND payment_ref NOT IN ('tester','free-trial','free','founder','LIFETIME_COMP')
     AND chart_data IS NOT NULL
-    AND (subscribe_end IS NULL OR subscribe_end <= NOW())
+    -- หมดอายุมาแล้วเกิน 3 วัน (bon 5 ต.ค. 69 "ตัด") — คนที่เพิ่งหมดได้ข้อความเตือนต่ออายุไปแล้ว ส่งซ้ำดูเร่ง
+    AND (subscribe_end IS NULL OR subscribe_end <= NOW() - interval '3 days')
   ORDER BY subscribe_end DESC NULLS LAST`;
 
 async function audience() {
