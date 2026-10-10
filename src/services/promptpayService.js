@@ -17,6 +17,10 @@ function isEnabled() {
   return !!(process.env.PROMPTPAY_QR_PAYLOAD || process.env.PROMPTPAY_ID);
 }
 
+// PROMPTPAY_QR_NO_AMOUNT=true → ส่ง QR ร้านค้าตามต้นฉบับ ไม่แทรกยอดเงิน (ลูกค้ากรอก 399 เอง)
+// ไว้สลับได้โดยไม่ต้อง deploy ถ้าพบว่าแอปธนาคารบางเจ้าไม่รับ QR ร้านค้าที่เราใส่ยอดเงินให้
+const amountEmbedded = () => !(process.env.PROMPTPAY_QR_PAYLOAD && process.env.PROMPTPAY_QR_NO_AMOUNT === 'true');
+
 // ===== EMVCo helpers (สำหรับ QR ร้านค้า static → ใส่ยอดเงิน) =====
 function crc16(str) {
   let crc = 0xFFFF;
@@ -54,7 +58,7 @@ function injectAmount(staticPayload, amountTHB) {
 // สร้าง payload ตามยอดเงิน (บาท)
 function payload(amountTHB) {
   const merchant = process.env.PROMPTPAY_QR_PAYLOAD;
-  if (merchant) return injectAmount(merchant.trim(), amountTHB);
+  if (merchant) return amountEmbedded() ? injectAmount(merchant.trim(), amountTHB) : merchant.trim();
   if (process.env.PROMPTPAY_ID) {
     return generatePayload(String(process.env.PROMPTPAY_ID).trim(), { amount: Number(amountTHB) });
   }
@@ -92,6 +96,19 @@ function formatTarget(raw) {
   return local;
 }
 
+// บัญชีธนาคารสำหรับโอนเอง — ใช้เมื่อ QR ร้านค้าไม่มีเบอร์พร้อมเพย์ให้ถอด (QR แบบจ่ายบิลของ K Shop)
+// 10 ต.ค. 69 ลูกค้าสแกนไม่ผ่านแล้วขอ "เลขบัญชี" แต่หน้าจ่ายเงินไม่มีให้ → ค้างจ่าย 9 รายการ
+// BANK_ACCOUNT_NO=0738644158 BANK_NAME=กสิกรไทย BANK_ACCOUNT_NAME=แอสโทรลิงค์
+function bankAccount() {
+  const no = (process.env.BANK_ACCOUNT_NO || '').replace(/\D/g, '');
+  if (!no) return null;
+  return {
+    no: no.length === 10 ? `${no.slice(0, 3)}-${no.slice(3, 4)}-${no.slice(4, 9)}-${no.slice(9)}` : no,
+    bank: (process.env.BANK_NAME || '').trim() || null,
+    name: (process.env.BANK_ACCOUNT_NAME || '').trim() || null,
+  };
+}
+
 async function qrPng(amountTHB, opts = {}) {
   return QRCode.toBuffer(payload(amountTHB), {
     type: 'png',
@@ -103,5 +120,5 @@ async function qrPng(amountTHB, opts = {}) {
 }
 
 module.exports = {
-  isEnabled, payload, qrPng, injectAmount, crc16, recipient, PRICE_THB, COUPLE_PRICE_THB,
+  isEnabled, amountEmbedded, payload, qrPng, injectAmount, crc16, recipient, bankAccount, PRICE_THB, COUPLE_PRICE_THB,
 };

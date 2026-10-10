@@ -79,7 +79,7 @@
 
       <ol class="steps">
         <li><span class="num">1</span><span>บันทึกรูป QR แล้วเปิด<b>แอปธนาคาร</b> → <b>สแกน</b> → <b>รูปภาพ/อัลบั้ม</b></span></li>
-        <li><span class="num">2</span><span>โอนเงิน (ยอดขึ้นให้อัตโนมัติ) แล้ว<b>เก็บภาพสลิป</b></span></li>
+        <li><span class="num">2</span><span id="step2">โอนเงิน (ยอดขึ้นให้อัตโนมัติ) แล้ว<b>เก็บภาพสลิป</b></span></li>
         <li><span class="num">3</span><span><b>ส่งรูปสลิปเข้าแชท</b> Prinnie333 — ระบบเปิดให้อัตโนมัติ</span></li>
       </ol>
 
@@ -89,8 +89,18 @@
         <summary>💳 สแกน QR ไม่ได้? โอนเองก็ได้ค่ะ</summary>
         <div class="body">
           <div class="why">
-            บางแอป (เช่น K PLUS) สแกน QR แล้วเด้งไปหน้าจ่ายด้วยแต้ม<br>
-            ให้เลือก <b>“โอนเงิน / พร้อมเพย์”</b> ในแอปธนาคาร แล้วกรอกตามนี้แทนได้เลยค่ะ
+            บางแอปธนาคารสแกน QR นี้ไม่ผ่าน<br>
+            ให้เลือก <b>“โอนเงิน”</b> ในแอปธนาคาร แล้วกรอกตามนี้แทนได้เลยค่ะ
+          </div>
+          <div class="field" id="f-bank" style="display:none">
+            <span class="k">ธนาคาร</span><span class="v" id="bk-bank">—</span>
+          </div>
+          <div class="field" id="f-acct" style="display:none">
+            <span class="k">เลขบัญชี</span><span class="v" id="bk-no">—</span>
+            <button class="copy" data-src="bk-no">คัดลอก</button>
+          </div>
+          <div class="field" id="f-bkname" style="display:none">
+            <span class="k">ชื่อบัญชี</span><span class="v" id="bk-name">—</span>
           </div>
           <div class="field" id="f-target">
             <span class="k">พร้อมเพย์</span><span class="v" id="pp-target">—</span>
@@ -146,14 +156,24 @@
           setTimeout(()=>URL.revokeObjectURL(url), 4000);
         }catch(_){ window.open(qrUrl, '_blank'); }
       });
-      // ช่องทางโอนเอง — ซ่อนทั้งบล็อกถ้าเซิร์ฟเวอร์ไม่มีเลขพร้อมเพย์ให้ (จะได้ไม่โชว์ช่องว่าง)
-      const pp = d.promptpay || {};
-      if (pp.target) {
-        document.getElementById('pp-target').textContent = pp.target;
+      // QR ไม่ฝังยอด → บอกให้กรอก 399 เอง (สลับได้จาก PROMPTPAY_QR_NO_AMOUNT บนเซิร์ฟเวอร์)
+      if (d.qr_amount_embedded === false) {
+        document.getElementById('step2').innerHTML = 'กรอกยอด <b>' + (d.price_thb || 399).toLocaleString() + ' บาท</b> โอนเงิน แล้ว<b>เก็บภาพสลิป</b>';
+      }
+      // ช่องทางโอนเอง — ซ่อนทั้งบล็อกถ้าเซิร์ฟเวอร์ไม่มีทั้งเลขพร้อมเพย์และบัญชีธนาคาร (จะได้ไม่โชว์ช่องว่าง)
+      const pp = d.promptpay || {}, bk = d.bank || null;
+      if (pp.target || bk) {
         document.getElementById('pp-amt').textContent = (d.price_thb || 399).toLocaleString() + ' บาท';
-        if (pp.name) {
-          document.getElementById('pp-name').textContent = pp.name;
-          document.getElementById('f-name').style.display = 'flex';
+        if (bk) {
+          if (bk.bank) { document.getElementById('bk-bank').textContent = bk.bank; document.getElementById('f-bank').style.display = 'flex'; }
+          document.getElementById('bk-no').textContent = bk.no; document.getElementById('f-acct').style.display = 'flex';
+          if (bk.name) { document.getElementById('bk-name').textContent = bk.name; document.getElementById('f-bkname').style.display = 'flex'; }
+        }
+        if (pp.target) {
+          document.getElementById('pp-target').textContent = pp.target;
+          if (pp.name) { document.getElementById('pp-name').textContent = pp.name; document.getElementById('f-name').style.display = 'flex'; }
+        } else {
+          document.getElementById('f-target').style.display = 'none';
         }
       } else {
         document.getElementById('alt').style.display = 'none';

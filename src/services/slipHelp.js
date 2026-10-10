@@ -6,6 +6,8 @@
 //
 // เขียนตามกติกาใน CLAUDE.md: ไทยธรรมดา ประโยคสั้น บอกว่าต้องทำอะไรต่อชัด ๆ
 
+const promptpay = require('./promptpayService');
+
 const CLAIMS_PAID = /จ่ายแล้ว|จ่ายเงินแล้ว|โอนแล้ว|โอนเงินแล้ว|ชำระแล้ว|ตัดเงิน|เงินออก|ส่งสลิป|สลิป/;
 
 const claimsPaid = (text) => CLAIMS_PAID.test(String(text || ''));
@@ -49,6 +51,9 @@ function reminderText({ name, order, payUrl, round }) {
     '• ถ้าโอนแล้ว: ส่งรูปสลิปการโอนมาในแชทนี้ได้เลย ระบบจะเปิดใช้งานให้อัตโนมัติ ไม่ต้องโอนซ้ำค่ะ',
     `• ถ้ายังไม่ได้โอน: สแกนจ่ายได้ที่ลิงก์นี้ค่ะ\n👉 ${payUrl}`,
   ];
+  // สแกนไม่ผ่าน → ให้เลขบัญชีโอนเองไปด้วยเลย ไม่ต้องรอถาม (10 ต.ค. 69 ลูกค้าหลายคนสแกนไม่ได้แล้วค้างจ่าย)
+  const bk = promptpay.bankAccount();
+  if (bk) lines.push(`• ถ้าสแกนไม่ได้: โอนเข้าบัญชี${bk.bank ? ' ' + bk.bank : ''} ${bk.no}${bk.name ? ' ชื่อบัญชี ' + bk.name : ''} แล้วส่งรูปสลิปมาในแชทนี้ค่ะ`);
   if (round && (!order || order.type !== 'couple')) {
     lines.push('', `สมัครภายใน ${round.cutoff} มีสิทธิ์ลุ้นดูดวงกับอาจารย์ปรินนี่ฟรี รอบ ${round.round} ค่ะ`);
   }

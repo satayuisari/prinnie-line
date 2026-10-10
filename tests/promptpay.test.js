@@ -51,3 +51,38 @@ describe('เลขพร้อมเพย์สำหรับโอนเอ�
       'เลขที่โชว์ให้โอนเอง ต้องตรงกับปลายทางใน QR');
   });
 });
+
+// 10 ต.ค. 69: ลูกค้าสแกน QR ร้าน K Shop ไม่ผ่านหลายคน ขอเลขบัญชี แต่ QR แบบจ่ายบิลไม่มีเบอร์พร้อมเพย์ให้ถอด
+// → เพิ่มบัญชีธนาคารโอนเอง + สวิตช์ส่ง QR ไม่ฝังยอด
+describe('บัญชีธนาคารโอนเอง + QR ไม่ฝังยอด', () => {
+  const BANK = ['BANK_ACCOUNT_NO', 'BANK_NAME', 'BANK_ACCOUNT_NAME', 'PROMPTPAY_QR_NO_AMOUNT'];
+  beforeEach(() => { for (const k of BANK) delete process.env[k]; });
+
+  test('ตั้งเลขบัญชี 10 หลัก → จัดรูปแบบกสิกร xxx-x-xxxxx-x พร้อมธนาคารและชื่อ', () => {
+    const pp = load({ BANK_ACCOUNT_NO: '0738644158', BANK_NAME: 'กสิกรไทย', BANK_ACCOUNT_NAME: 'แอสโทรลิงค์' });
+    assert.deepEqual(pp.bankAccount(), { no: '073-8-64415-8', bank: 'กสิกรไทย', name: 'แอสโทรลิงค์' });
+  });
+
+  test('ไม่ตั้งเลขบัญชี → null (หน้าเว็บซ่อนแถวนี้)', () => {
+    assert.equal(load({}).bankAccount(), null);
+  });
+
+  test('QR ร้านค้าปกติฝังยอด (tag01=12, tag54) · เปิด PROMPTPAY_QR_NO_AMOUNT → ส่งต้นฉบับไม่แก้', () => {
+    const raw = generatePayload('0898887777', {});
+    let pp = load({ PROMPTPAY_QR_PAYLOAD: raw });
+    assert.equal(pp.amountEmbedded(), true);
+    assert.ok(pp.payload(399).includes('5406399.00'));
+    pp = load({ PROMPTPAY_QR_PAYLOAD: raw, PROMPTPAY_QR_NO_AMOUNT: 'true' });
+    assert.equal(pp.amountEmbedded(), false);
+    assert.equal(pp.payload(399), raw);
+  });
+
+  test('เตือนออเดอร์ค้าง มีเลขบัญชีโอนเองเมื่อตั้งค่าไว้', () => {
+    load({ BANK_ACCOUNT_NO: '0738644158', BANK_NAME: 'กสิกรไทย', BANK_ACCOUNT_NAME: 'แอสโทรลิงค์' });
+    const sh = require('../src/services/slipHelp');
+    const t = sh.reminderText({ name: 'ส้ม', order: { type: 'subscription' }, payUrl: 'https://x/pay.html?ref=a' });
+    assert.match(t, /กสิกรไทย 073-8-64415-8 ชื่อบัญชี แอสโทรลิงค์/);
+    delete process.env.BANK_ACCOUNT_NO;
+    assert.doesNotMatch(sh.reminderText({ order: { type: 'subscription' }, payUrl: 'u' }), /เลขบัญชี|บัญชี /);
+  });
+});

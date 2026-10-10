@@ -43,6 +43,8 @@ router.get('/order/:ref', async (req, res) => {
   res.json({
     ref: o.ref, amount: o.amount, price_thb: o.amount / 100, status: o.status, type: o.type,
     promptpay: promptpay.recipient(),
+    bank: promptpay.bankAccount(),
+    qr_amount_embedded: promptpay.amountEmbedded(),
   });
 });
 
