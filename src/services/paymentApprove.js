@@ -6,6 +6,7 @@ const subscribers = require('./subscriberService');
 const couplePurchase = require('./couplePurchase');
 const lineMessaging = require('./lineMessaging');
 const commission = require('./affiliateCommission');
+const dailyCatchup = require('./dailyCatchup');
 
 async function approve(order, chargeRef) {
   if (!order) return { ok: false, reason: 'not_found' };
@@ -25,7 +26,10 @@ async function approve(order, chargeRef) {
   const expTH = new Date(r.expire_date).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
   await lineMessaging.pushText(order.line_user_id,
     `ชำระเงินสำเร็จ! ✨\n\nสมาชิก Prinnie333 ของคุณใช้ได้ถึง ${expTH}\nรับดวงประจำวันทุกเช้า 08:00 น. 🌟`).catch(() => {});
-  return { ok: true, expire: r.expire_date };
+  // อนุมัติหลังรอบ 08:00 → ส่งดวงของวันนี้ให้เลย จะได้รู้ว่าติดแล้วจริง (16 ต.ค. 69) — พังก็ไม่กระทบการเปิดสมาชิก
+  const caught = await dailyCatchup.sendTodayDaily(order.line_user_id).catch(e => { console.error('[approve] catchup:', e.message); return 'error'; });
+  if (caught === 'sent') console.log(`[approve] ส่งดวงวันนี้ให้ทันที ${order.line_user_id.slice(0, 9)}…`);
+  return { ok: true, expire: r.expire_date, todayDaily: caught };
 }
 
 module.exports = { approve };
