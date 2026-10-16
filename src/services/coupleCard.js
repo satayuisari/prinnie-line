@@ -92,4 +92,20 @@ async function render(opts) {
   return sharp(base).composite([{ input: overlay, left: 0, top: 0 }]).jpeg({ quality: 90 }).toBuffer();
 }
 
-module.exports = { render, band };
+// ข้อความบอกต่อ — ส่งคู่กับการ์ดเข้าแชทของลูกค้าเองและตอนกดแชร์ให้เพื่อน
+// 16 ต.ค. 69 bon: การ์ดอย่างเดียวคนรับไม่รู้ว่าคืออะไร ต้องมีคำอธิบายให้ "แชร์ให้คนอื่นอ่านพอเข้าใจ"
+// ใช้ "เรา" เป็นคำกลาง ๆ ใช้ได้ทั้งชายหญิง · ไม่อ้างความแม่น ไม่มีศัพท์โหราศาสตร์
+const ADD_URL = 'https://line.me/R/ti/p/%40prinnie333';
+function shareText({ score, a, b }) {
+  const pct = Math.max(0, Math.min(100, Number(score) || 0));
+  return [
+    `เราลองผูกดวงคู่กับ Prinnie333 มา ได้ ${pct}% 💛`,
+    'ดูจากวันเวลาเกิดจริงของสองคน ไม่ใช่แค่ราศีรวม ๆ',
+    '',
+    'ใครอยากรู้ว่าตัวเองกับคนนั้นเข้ากันกี่ % ลองได้ฟรีค่ะ',
+    `แอดไลน์ ${OA} แล้วกดเมนู "ดูดวงคู่"`,
+    `👉 ${ADD_URL}`,
+  ].join('\n');
+}
+
+module.exports = { render, band, shareText };

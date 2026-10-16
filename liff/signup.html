@@ -460,10 +460,29 @@
     }
   }
 
-  async function shareCouple(url) {
+  // การ์ด + ข้อความบอกต่อ ส่งคู่กันเสมอ — รูปอย่างเดียวคนรับไม่รู้ว่าคืออะไร
+  function coupleMessages(url, text) {
+    const m = [{ type: 'image', originalContentUrl: url, previewImageUrl: url }];
+    if (text) m.push({ type: 'text', text });
+    return m;
+  }
+  // ส่งการ์ด + ข้อความเข้าแชทไลน์ของลูกค้าเอง (ขึ้นเป็นข้อความฝั่งลูกค้า) จะได้กดส่งต่อจากแชทได้เลย
+  // ส่งครั้งเดียวต่อผลหนึ่งครั้ง · นอกแอป LINE ทำไม่ได้ → เงียบ
+  let lastSentCard = null;
+  async function sendCoupleToOwnChat(url, text) {
+    if (!url || lastSentCard === url) return;
+    try {
+      if (liff.isInClient && liff.isInClient() && liff.isApiAvailable && liff.isApiAvailable('sendMessages')) {
+        await liff.sendMessages(coupleMessages(url, text));
+        lastSentCard = url;
+      }
+    } catch (e) { /* ปิดสิทธิ์ส่งข้อความ/ยกเลิก — ไม่ต้องทำอะไร */ }
+  }
+
+  async function shareCouple(url, text) {
     try {
       if (liff.isApiAvailable && liff.isApiAvailable('shareTargetPicker')) {
-        await liff.shareTargetPicker([{ type: 'image', originalContentUrl: url, previewImageUrl: url }]);
+        await liff.shareTargetPicker(coupleMessages(url, text));
       } else {
         alert('กดค้างที่รูปเพื่อบันทึก แล้วนำไปแชร์ได้เลยค่ะ 💜');
       }
@@ -476,7 +495,8 @@
     const card = d.card_url ? `
       <div style="margin:2px 0 14px;">
         <img src="${d.card_url}" alt="ดวงคู่" style="width:100%;border-radius:14px;display:block;box-shadow:0 6px 24px rgba(0,0,0,0.35);"/>
-        <button class="btn" style="margin-top:10px" onclick="shareCouple('${d.card_url}')">📤 แชร์การ์ดให้เพื่อน</button>
+        <button class="btn" style="margin-top:10px" onclick="shareCouple('${d.card_url}', window.__coupleShareText || '')">📤 แชร์การ์ดให้เพื่อน</button>
+        <div style="text-align:center;font-size:0.72rem;color:rgba(255,255,255,0.45);margin-top:6px;">ส่งการ์ดกับข้อความเข้าแชทไลน์ของคุณให้แล้ว กดส่งต่อจากแชทได้เลย</div>
         <div style="text-align:center;font-size:0.72rem;color:rgba(255,255,255,0.45);margin-top:6px;">หรือกดค้างที่รูปเพื่อบันทึกไปโพสต์ได้เลย</div>
       </div>` : '';
     const head = `
@@ -508,6 +528,8 @@
       body = '<div style="padding:14px 0;text-align:center;color:rgba(255,255,255,0.7);font-size:0.9rem;">ดวงของคุณสองคนค่อนข้างเป็นกลาง ✨<br/>ไม่มีมุมเด่นพิเศษระหว่างกัน</div>';
     }
     document.getElementById('couplebox').innerHTML = card + head + rows + body;
+    window.__coupleShareText = d.share_text || '';
+    sendCoupleToOwnChat(d.card_url, d.share_text);
   }
 
   async function goToCoupleCheckout() {

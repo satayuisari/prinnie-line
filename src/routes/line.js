@@ -155,6 +155,7 @@ router.post('/synastry', requireAuth, async (req, res) => {
       partner: { sun: partnerChart.sun, moon: partnerChart.moon, rising: partnerChart.rising },
       score:   reading.score,
       card_url: coupleCardUrl(req, reading.score, me.nickname, partner_name),  // การ์ดแชร์ได้ (ทุกคน รวม teaser)
+      share_text: coupleCard.shareText({ score: reading.score, a: me.nickname, b: partner_name }),  // คำอธิบายคู่กับการ์ด
     };
 
     if (active) {
