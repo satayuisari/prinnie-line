@@ -73,12 +73,14 @@ async function attachSlip(line_user_id, messageId) {
 // ออเดอร์ PromptPay ที่รอ staff อนุมัติ (มี/ยังไม่มีสลิปก็แสดง — เรียงสลิปเข้าใหม่ก่อน)
 async function listPendingPromptpay(limit = 50) {
   const r = await db.query(
-    `SELECT ref, type, line_user_id, amount, slip_message_id,
-            to_char(slip_received_at AT TIME ZONE 'Asia/Bangkok','DD/MM HH24:MI') AS slip_at,
-            to_char(created_at       AT TIME ZONE 'Asia/Bangkok','DD/MM HH24:MI') AS created
-     FROM payment_orders
-     WHERE method = 'promptpay' AND status = 'PENDING'
-     ORDER BY (slip_message_id IS NOT NULL) DESC, created_at DESC
+    `SELECT o.ref, o.type, o.line_user_id, o.amount, o.slip_message_id,
+            COALESCE(NULLIF(s.nickname, ''), s.display_name) AS name,
+            to_char(o.slip_received_at AT TIME ZONE 'Asia/Bangkok','DD/MM HH24:MI') AS slip_at,
+            to_char(o.created_at       AT TIME ZONE 'Asia/Bangkok','DD/MM HH24:MI') AS created
+     FROM payment_orders o
+     LEFT JOIN line_subscribers s ON s.line_user_id = o.line_user_id
+     WHERE o.method = 'promptpay' AND o.status = 'PENDING'
+     ORDER BY (o.slip_message_id IS NOT NULL) DESC, o.created_at DESC
      LIMIT $1`, [limit]);
   return r.rows;
 }

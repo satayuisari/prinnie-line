@@ -146,7 +146,20 @@ async function handleEvent(event) {
   // รูปภาพ = น่าจะเป็นสลิปโอนเงิน → ผูกกับออเดอร์ PromptPay ที่ค้างอยู่ของ user นี้
   // มีออเดอร์ค้าง → ตอบรับสลิป (staff อนุมัติบน dashboard). ไม่มี → รูปทั่วไป เงียบไว้ให้ staff ดูแล
   if (event.type === 'message' && event.message.type === 'image') {
-    const order = await paymentOrders.attachSlip(event.source.userId, event.message.id).catch(() => null);
+    let order = await paymentOrders.attachSlip(event.source.userId, event.message.id).catch(() => null);
+    if (!order) {
+      // สมาชิกที่ยังไม่หมดอายุ โอนต่ออายุมาก่อนโดยไม่กดเมนู → เดิมระบบ "เงียบ" สลิปหายไปเฉย ๆ
+      // (16 ต.ค. 69 เคส jungjing พิมพ์ "ต่อค่า" แล้วส่งสลิป ไม่มีอะไรขึ้นเลย bon ต้องอนุมัติมือ)
+      // ตอนนี้: สร้างออเดอร์ต่ออายุให้ แนบสลิป แล้วเดินตามขั้นตอนสลิปปกติ (SlipOK ตรวจ / ไม่ผ่านแจ้งแอดมิน)
+      const subNow = await subscribers.getByLineUserId(event.source.userId).catch(() => null);
+      const activeNow = subNow && subNow.subscribe_end && new Date(subNow.subscribe_end) > new Date();
+      if (activeNow && subNow.chart_data) {
+        const pp = require('../services/promptpayService');
+        await paymentOrders.createOrReuse({ type: 'subscription', line_user_id: event.source.userId,
+          amount: pp.PRICE_THB * 100, payload: { source: 'slip-without-order' } }).catch(() => null);
+        order = await paymentOrders.attachSlip(event.source.userId, event.message.id).catch(() => null);
+      }
+    }
     if (!order) {
       // รูปแต่ไม่มีออเดอร์ค้าง — ไม่กวนแอดมิน (ส่วนใหญ่รูปทั่วไป/สติกเกอร์/ยังไม่กดสมัคร)
       // แค่ชี้ทางให้คนที่ยังไม่จ่าย กดสมัครก่อน — คนที่โอนจริงจะกดสมัครแล้วส่งสลิปใหม่เอง
@@ -238,7 +251,7 @@ async function handleEvent(event) {
     // ไม่เตือนหมวดทั่วไป (ถามดวงเฉย ๆ) กัน spam · ตัดข้อความยาวไว้พอเห็น context
     const { priority: pr, category: cat } = triage.classify(text);
     if (pr === 'high') {
-      const catTH = { emotional: 'ต้องการกำลังใจ 💛', angry: 'ไม่พอใจ/ร้องเรียน 🔴', payment: 'เรื่องเงิน/สมัคร 💰' }[cat] || cat;
+      const catTH = { emotional: 'ต้องการกำลังใจ 💛', angry: 'ไม่พอใจ/ร้องเรียน 🔴', payment: 'เรื่องเงิน/สมัคร 💰', booking: 'อยากนัดดูดวงกับอาจารย์ 📞 (ติดต่อกลับ)' }[cat] || cat;
       notifyAdmins(`🔔 ลูกค้าทักเรื่องด่วน (${catTH})\nชื่อ: ${name || '-'}\nid: ${event.source.userId}\n💬 "${text.slice(0, 150)}"\n👉 ตอบใน dashboard`).catch(() => {});
     }
 

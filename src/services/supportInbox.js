@@ -6,7 +6,7 @@ const supportAI = require('./supportAI');
 
 // หมวดที่ "บอทตอบเอง" ได้ — payment ตอบสถานะ/ราคาตามข้อมูลจริง (ดู guard ข้อพิพาทใน webhook)
 // อารมณ์/โกรธ(ร้องเรียน/คืนเงิน) ไม่อยู่ในนี้ → ให้คนตอบเสมอ
-const AUTO_REPLY = new Set(['astro', 'general', 'payment']);
+const AUTO_REPLY = new Set(['astro', 'general', 'payment', 'booking']);
 
 // เก็บข้อความเข้า inbox (กันสแปม: ถ้ามี OPEN ของ user เดิม + ข้อความซ้ำใน 60 วิ ไม่เก็บซ้ำ)
 async function capture(lineUserId, displayName, message) {

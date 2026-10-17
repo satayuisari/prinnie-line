@@ -91,6 +91,7 @@ function payCard(o, key) {
     <div class="imeta">
       <span class="cat" style="background:#1faa59">฿${baht}</span>
       <span class="muted">${kind}</span>
+      <b>${esc(o.name || '(ไม่มีชื่อ)')}</b>
       <span class="who">${esc(o.line_user_id).slice(0, 14)}…</span>
       <span class="muted">${o.slip_at ? 'สลิป ' + esc(o.slip_at) : 'สร้าง ' + esc(o.created)}</span>
       <span class="muted" style="font-family:monospace">${esc(o.ref)}</span></div>
