@@ -51,6 +51,13 @@ body { width:${W}px; height:${H}px; overflow:hidden; background:#120D22; font-fa
 .title { font-size:120px; font-weight:800; background:linear-gradient(180deg,#FFF3D6,#E9C98A 55%,#B8893E); -webkit-background-clip:text; color:transparent; filter:drop-shadow(0 4px 14px #000); }
 .sub { font-size:40px; color:#D9D1F0; margin:8px 0 18px; text-shadow:0 2px 8px #000; }
 .emoji { position:absolute; left:210px; top:10px; font-size:120px; font-family:'Apple Color Emoji'; line-height:1; }
+.backs { display:flex; gap:40px; margin:30px 0 10px; }
+.cb { width:250px; height:400px; border-radius:20px; position:relative; background:radial-gradient(circle at 50% 45%, #3E2F6B, #231A40 70%); border:4px solid #D4AF6E; box-shadow:0 12px 34px rgba(0,0,0,.6); }
+.cb .i { position:absolute; inset:14px; border:2px solid rgba(212,175,110,.7); border-radius:12px; }
+.cb .st { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-size:90px; color:#E9C98A; }
+.cb .lb { position:absolute; bottom:-70px; width:100%; font-size:46px; font-weight:800; color:#fff; }
+.card { width:400px; height:684px; object-fit:cover; border-radius:22px; box-shadow:0 0 0 4px #D4AF6E, 0 16px 44px rgba(0,0,0,.7); margin-bottom:26px; }
+.pos { font-size:44px; color:#F0D49A; font-weight:800; }
 .flash { position:absolute; inset:0; background:#FFF6DC; opacity:0; z-index:8; }
 .foot { position:absolute; bottom:300px; width:100%; font-size:42px; color:#E9C98A; z-index:5; }`;
 
@@ -60,6 +67,10 @@ const sceneHtml = scenes.map((s, i) => {
   if (s.type === 'hook') return `<div class="scene" id="s${i}">${s.badge ? `<div class="badge">${esc(s.badge)}</div>` : ''}<div>${words(s.words)}</div></div>`;
   if (s.type === 'rank') return `<div class="scene" id="s${i}"><div style="position:relative"><div class="rank">${s.rank}</div>${s.emoji ? `<div class="emoji">${s.emoji}</div>` : ''}</div>
     <div class="title">${esc(s.title)}</div><div class="sub">${esc(s.sub || '')}</div><div>${words(s.words, 'white')}</div></div>`;
+  if (s.type === 'cards') return `<div class="scene" id="s${i}"><div>${words(s.words || [], 'white')}</div>
+    <div class="backs">${['ซ้าย','กลาง','ขวา'].map(l => `<div class="cb"><div class="i"></div><div class="st">✦</div><div class="lb">${l}</div></div>`).join('')}</div></div>`;
+  if (s.type === 'card') return `<div class="scene" id="s${i}" style="top:300px"><img class="card" src="data:image/jpeg;base64,${fs.readFileSync(path.resolve(s.img)).toString('base64')}">
+    <div class="pos">${esc(s.pos || '')}</div><div class="title" style="font-size:96px">${esc(s.title)}</div><div>${words(s.words || [], 'white')}</div></div>`;
   return `<div class="scene" id="s${i}"><div>${words(s.words)}</div><div class="w white" style="margin-top:30px">${esc(s.line || '')}</div></div>`;
 }).join('');
 
@@ -80,6 +91,9 @@ scenes.forEach((s,i)=>{
   const r=el.querySelector('.rank'); if(r) A(r,[{transform:'translateY(-500px) rotate(-30deg)'},{transform:'translateY(20px) rotate(4deg)',offset:.7},{transform:'none'}],{duration:520,delay:s.start+80,easing:'ease-in'});
   const t=el.querySelector('.title'); if(t) A(t,[{transform:'translateX(-120%)',opacity:0},{transform:'none',opacity:1}],{duration:380,delay:s.start+450});
   const em=el.querySelector('.emoji'); if(em) A(em,[{transform:'scale(0) rotate(-40deg)'},{transform:'scale(1.3) rotate(10deg)',offset:.6},{transform:'scale(1) rotate(0)'}],{duration:420,delay:s.start+700,easing:'cubic-bezier(.2,1.4,.4,1)'});
+  el.querySelectorAll('.cb').forEach((c,j)=>A(c,[{transform:'translateY(300px) rotateY(90deg)',opacity:0},{transform:'translateY(-20px) rotateY(0)',opacity:1,offset:.7},{transform:'none',opacity:1}],{duration:500,delay:s.start+700+j*350,easing:'cubic-bezier(.2,1.3,.4,1)'}));
+  el.querySelectorAll('.cb').forEach((c,j)=>A(c,[{transform:'none'},{transform:'translateY(-14px)'},{transform:'none'}],{duration:900,delay:s.start+1900+j*300,iterations:Math.max(1,Math.floor((s.dur-2200)/900)),easing:'ease-in-out',composite:'add'}));
+  const cd=el.querySelector('.card'); if(cd) A(cd,[{transform:'scaleX(0)',filter:'brightness(3)'},{transform:'scaleX(1)',filter:'brightness(1.6)',offset:.6},{transform:'scaleX(1)',filter:'brightness(1)'}],{duration:650,delay:s.start+100,easing:'ease-out'});
   const b=el.querySelector('.badge'); if(b) A(b,[{transform:'rotate(-4deg) scale(1)'},{transform:'rotate(4deg) scale(1.08)'},{transform:'rotate(-4deg) scale(1)'}],{duration:600,delay:s.start,iterations:Math.floor(s.dur/600),easing:'ease-in-out'});
   if(s.rank===1){
     A(document.getElementById('flash'),[{opacity:0},{opacity:.85,offset:.15},{opacity:0}],{duration:450,delay:s.start+60});
@@ -109,6 +123,8 @@ for (const s of scenes) {
   add('0.6*sin(2*PI*(200+900*t)*t)*exp(-6*t)', 0.35, s.start, 0.5);                     // วูช
   if (s.rank === 1) add('0.7*sin(2*PI*1320*t)*exp(-3*t)+0.4*sin(2*PI*1980*t)*exp(-4*t)', 1.2, s.start + 100, 0.6); // ติ๊ง
   else if (s.type === 'rank') add('0.6*sin(2*PI*660*t)*exp(-9*t)', 0.3, s.start + 520, 0.45); // ป๊อปตอนเลขลง
+  if (s.type === 'card') add('0.6*sin(2*PI*990*t)*exp(-5*t)+0.3*sin(2*PI*1480*t)*exp(-6*t)', 0.8, s.start + 400, 0.5); // ติ๊งตอนพลิกไพ่
+  if (s.type === 'cards') [0, 1, 2].forEach(j => add('0.5*sin(2*PI*(300+700*t)*t)*exp(-8*t)', 0.3, s.start + 700 + j * 350, 0.4));
 }
 const audioIn = [], filters = [];
 sfx.forEach((x, i) => {
